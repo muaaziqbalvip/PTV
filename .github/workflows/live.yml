@@ -45,4 +45,4 @@ jobs:
           -c:v libx264 -preset veryfast \
           -crf 25 -maxrate 2500k -bufsize 5000k \
           -pix_fmt yuv420p -g 50 -c:a aac -b:a 128k \
-          -f flv "rtmp://a.rtmp.youtube.com/live2/vckh-qm35-j90w-r3bz-9jza" || true
+          -f flv "rtmp://a.rtmp.youtube.com/live2/aj4b-ghht-s93w-8557-5dru" || true
