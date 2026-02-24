@@ -33,5 +33,5 @@ jobs:
           timeout 5.8h ffmpeg -re -stream_loop -1 -user_agent "Mozilla/5.0" -i "$STREAM_URL" \
           -c:v libx264 -preset ultrafast -b:v 2500k -maxrate 3000k -bufsize 6000k \
           -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k -ar 44100 \
-          -f flv "rtmp://a.rtmp.youtube.com/live2/${{ secrets.MY_STREAM_KEY }}"
+          -f flv "rtmp://a.rtmp.youtube.com/live2/4kpb-g391-9ym6-64er-4rag"
           
