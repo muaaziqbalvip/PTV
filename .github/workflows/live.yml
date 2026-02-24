@@ -2,12 +2,11 @@ name: MiTV_24-7_NonStop_Engine
 
 on:
   schedule:
-    # Har 5 ghante baad (00:00, 05:00, 10:00, etc.) naya server start hoga
     - cron: '0 */5 * * *'
   push:
     paths:
       - 'playlist.m3u'
-  workflow_dispatch: # Manual start ka button
+  workflow_dispatch:
 
 jobs:
   MiTV_Cloud_Stream:
@@ -21,17 +20,23 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-      - name: 3. Start Professional Streaming
+      - name: 3. Start Professional Streaming (Adaptive Quality)
         run: |
-          # Playlist file se link uthana
           STREAM_URL=$(grep -v '^#' playlist.m3u | head -n 1)
-          
-          echo "MiTV Network is launching stream: $STREAM_URL"
+          echo "MiTV Network is launching adaptive stream: $STREAM_URL"
 
-          # 'timeout' command 5 ghante 50 minute tak chalayegi (6 ghante ki limit se pehle)
-          # Is doraan agla schedule wala server pehle hi start ho chuka hoga
-          timeout 5.8h ffmpeg -re -stream_loop -1 -user_agent "Mozilla/5.0" -i "$STREAM_URL" \
-          -c:v libx264 -preset ultrafast -b:v 2500k -maxrate 3000k -bufsize 6000k \
-          -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k -ar 44100 \
-          -f flv "rtmp://a.rtmp.youtube.com/live2/4kpb-g391-9ym6-64er-4rag"
+          # timeout 5.8h taake naya server pehle hi line mein aa jaye
+          # -reconnect logic ko mazboot kiya hai
+          # -crf 23: Balance quality aur bitrate ke darmiyan
+          # -maxrate aur -bufsize: Slow internet par buffering rokne ke liye
+          
+          timeout 5.8h ffmpeg -re \
+          -reconnect 1 -reconnect_at_eof 1 -reconnect_streamed 1 -reconnect_delay_max 2 \
+          -stream_loop -1 \
+          -user_agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+          -i "$STREAM_URL" \
+          -c:v libx264 -preset veryfast \
+          -crf 23 -maxrate 3000k -bufsize 6000k \
+          -pix_fmt yuv420p -g 50 -c:a aac -b:a 128k -ar 44100 \
+          -f flv "rtmp://a.rtmp.youtube.com/live2/4kpb-g391-9ym6-64er-4rag" || true
           
