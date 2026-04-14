@@ -60,7 +60,7 @@ from telegram import (
     BotCommand,
     ChatAction,
 )
-from telegram.constants import ParseMode, ChatType
+from telegram.constants import ParseMode, ChatType, ChatAction
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
