@@ -58,7 +58,6 @@ from telegram import (
     ReplyKeyboardRemove,
     InputMediaPhoto,
     BotCommand,
-    ChatAction,
 )
 from telegram.constants import ParseMode, ChatType, ChatAction
 from telegram.ext import (
