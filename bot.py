@@ -32,8 +32,8 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List, Tuple
 
 # Telegram Imports
+# Purane imports ko delete kar ke ye paste karein
 from telegram import (
-    from telegram import (
     Update, 
     InlineKeyboardButton, 
     InlineKeyboardMarkup, 
@@ -41,6 +41,9 @@ from telegram import (
     ReplyKeyboardRemove,
     InputMediaPhoto
 )
+# NEW: ParseMode ko yahan se import karna zaroori hai
+from telegram.constants import ParseMode
+
 from telegram.ext import (
     ApplicationBuilder, 
     CommandHandler, 
