@@ -1,55 +1,28 @@
-name: MiTV_24-7_Final_Ultimate
+name: Telegram Proxy Runner
 
 on:
   schedule:
-    - cron: '0 */5 * * *'
-  push:
-    paths:
-      - 'playlist.m3u'
-  workflow_dispatch:
+    - cron: '0 */6 * * *' # Har 6 ghante baad auto-restart hoga
+  workflow_dispatch: # Manual start karne ke liye
 
 jobs:
-  MiTV_Cloud_Stream:
+  run-proxy:
     runs-on: ubuntu-latest
     steps:
-      - name: 1. Code Checkout
+      - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: 2. Install FFmpeg & Tools
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python_version: '3.10'
+
+      - name: Install Dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-liberation
-          sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
-          sudo chmod a+rx /usr/local/bin/yt-dlp
+          pip install python-telegram-bot # Ya jo bhi proxy library aap use karein
+          pip install cryptography uvloop
 
-      - name: 3. Start Professional Stream
-        run: |
-          STREAM_URL=$(grep -v '^#' playlist.m3u | head -n 1)
-          LOGO_URL="https://i.ibb.co/fzsgPwYG/2-1.png"
-          
-          # yt-dlp ko direct browser user-agent ke sath chalana taake "Bot" error na aaye
-          FINAL_LINK=$(yt-dlp --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36" -g -f "best" "$STREAM_URL" || echo "$STREAM_URL")
-
-          echo "Streaming from: $FINAL_LINK"
-
-          # Pure FFmpeg command without line break errors
-          timeout 5.8h ffmpeg -re -reconnect 1 -reconnect_at_eof 1 -reconnect_streamed 1 -reconnect_delay_max 5 -i "$FINAL_LINK" -i "$LOGO_URL" -filter_complex "[0:v]crop=iw:ih-40:0:40,scale=1280:720[v_cropped]; [1:v]scale=150:-1,rotate='if(between(mod(t,10),0,2), t*PI, 0)':c=none:ow=rotw(0):oh=roth(0)[logo]; [v_cropped]drawtext=text='Provided by MUAAZ IQBAL':fontcolor=white:fontsize=16:x=20:y=150:shadowcolor=black:shadowx=2:shadowy=2[v_base]; [v_base][logo]overlay=20:10" -af "asetrate=44100*1.02,aresample=44100" -c:v libx264 -preset superfast -tune zerolatency -crf 28 -maxrate 2000k -bufsize 4000k -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "rtmp://a.rtmp.youtube.com/live2/ffw8-ay98-j677-qx9h-3g4g" || true
-          timeout 5.8h ffmpeg -re -reconnect 1 -reconnect_at_eof 1 -reconnect_streamed 1 -reconnect_delay_max 5 \
-          -i "$STREAM_URL" -i "$LOGO_URL" \
-          -filter_complex "[0:v]crop=iw:ih-40:0:40,scale=1280:720[v_cropped]; [1:v]scale=150:-1,rotate='if(between(mod(t,10),0,2), t*PI, 0)':c=none:ow=rotw(0):oh=roth(0)[logo]; [v_cropped]drawtext=text='Provided by MUAAZ IQBAL':fontcolor=white:fontsize=16:x=20:y=150:shadowcolor=black:shadowx=2:shadowy=2[v_base]; [v_base][logo]overlay=20:10" \
-          -af "asetrate=44100*1.02,aresample=44100" \
-          -c:v libx264 -preset superfast -tune zerolatency -crf 28 -maxrate 2000k -bufsize 4000k \
-          -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k -ar 44100 \
-          -f flv "rtmp://a.rtmp.youtube.com/live2/ffw8-ay98-j677-qx9h-3g4g" || true
-          -user_agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-          -i "$STREAM_URL" -i "$LOGO_URL" \
-          -filter_complex \
-          "[1:v]scale=150:-1,rotate='if(between(mod(t,10),0,2), t*PI, 0)':c=none:ow=rotw(0):oh=roth(0)[logo]; \
-           [0:v]zoompan=z='1.1':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1280x720,hflip, \
-           drawtext=text='Provided by MUAAZ IQBAL':fontcolor=white:fontsize=18:x=20:y=160:shadowcolor=black:shadowx=2:shadowy=2[v_base]; \
-           [v_base][logo]overlay=20:10" \
-          -af "asetrate=44100*1.05,aresample=44100" \
-          -c:v libx264 -preset veryfast \
-          -crf 25 -maxrate 2500k -bufsize 5000k \
-          -pix_fmt yuv420p -g 50 -c:a aac -b:a 128k \
-          -f flv "rtmp://a.rtmp.youtube.com/live2/buhp-wyep-qsw6-w1d1-fvuh" || true
+      - name: Run Proxy Script
+        run: python proxy_script.py
+        env:
+          TG_SECRET: ${{ secrets.TG_SECRET }}
