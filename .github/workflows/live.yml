@@ -1,20 +1,41 @@
-name: MI AI BOT
+name: MiTV Network Pro Bot 24/7
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: '0 */5 * * *' # Har 5 ghante baad restart
   push:
-  workflow_dispatch:
+    branches: [ main ]
+  workflow_dispatch: # Manual start button
 
 jobs:
-  run:
+  mitv-run:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - run: pip install -r requirements.txt
-      - run: python bot.py
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create Firebase Config
+        run: |
+          echo '${{ secrets.FIREBASE_JSON }}' > firebase.json
+
+      - name: Run MiTV Bot with Auto-Restart
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          # Loop to restart bot if it crashes
+          while true; do
+            echo "🚀 Starting MiTV Network Bot..."
+            python bot.py
+            echo "⚠️ Bot crashed or stopped. Restarting in 5 seconds..."
+            sleep 5
+          done
