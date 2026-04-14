@@ -1,4 +1,4 @@
-firebase-admin
 pyrebase4
 cryptography
 requests
+uvloop
