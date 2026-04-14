@@ -1,28 +1,28 @@
-name: Telegram Proxy Runner
+name: Firebase-Fast-Proxy-24/7
 
 on:
   schedule:
-    - cron: '0 */6 * * *' # Har 6 ghante baad auto-restart hoga
-  workflow_dispatch: # Manual start karne ke liye
+    - cron: '0 */5 * * *' # Har 5 ghante auto trigger
+  workflow_dispatch: # Manual Button
 
 jobs:
-  run-proxy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python_version: '3.10'
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
-          pip install python-telegram-bot # Ya jo bhi proxy library aap use karein
-          pip install cryptography uvloop
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Run Proxy Script
-        run: python proxy_script.py
+      - name: Run Proxy System
         env:
           TG_SECRET: ${{ secrets.TG_SECRET }}
+        run: python proxy_script.py
