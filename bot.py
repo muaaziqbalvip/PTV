@@ -2,47 +2,49 @@ import firebase_admin
 from firebase_admin import credentials, db
 from telegram import *
 from telegram.ext import *
-import time, uuid
-from config import *
+import time
+import uuid
+from config import BOT_TOKEN, ADMIN_PASSWORD, FIREBASE_DB
 
+# 🔥 Firebase Init
 cred = credentials.Certificate("firebase.json")
-firebase_admin.initialize_app(cred, {'databaseURL': FIREBASE_DB})
+firebase_admin.initialize_app(cred, {
+    'databaseURL': FIREBASE_DB
+})
 
+# 🔥 Sessions
 sessions = {}
 
-# 🔥 START
+# ================= START =================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kb = [["👑 Admin", "🧑‍💻 Reseller"]]
-
-    await update.message.reply_photo(
-        photo=LOGO_URL,
-        caption="✨ *MI TV AI SYSTEM*\n\nSelect your role:",
-        parse_mode="Markdown",
+    await update.message.reply_text(
+        "🔥 Welcome to MI TV AI Bot\n\nSelect Role:",
         reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True)
     )
 
-# 🔥 MAIN HANDLER
+# ================= MAIN HANDLER =================
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    uid = str(update.message.from_user.id)
+    user_id = str(update.message.from_user.id)
     text = update.message.text
 
-    if uid not in sessions:
-        sessions[uid] = {}
+    if user_id not in sessions:
+        sessions[user_id] = {}
 
-    s = sessions[uid]
+    s = sessions[user_id]
 
-    # ROLE
+    # ========= ROLE =========
     if text == "👑 Admin":
         s.clear()
         s["role"] = "admin"
-        await update.message.reply_text("🔐 Enter Admin Password")
+        await update.message.reply_text("🔐 Enter Admin Password:")
 
     elif text == "🧑‍💻 Reseller":
         s.clear()
         s["role"] = "reseller"
-        await update.message.reply_text("📱 Enter Number")
+        await update.message.reply_text("📱 Enter Number:")
 
-    # ADMIN LOGIN
+    # ========= ADMIN LOGIN =========
     elif s.get("role") == "admin" and not s.get("login"):
         if text == ADMIN_PASSWORD:
             s["login"] = True
@@ -50,68 +52,54 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text("❌ Wrong Password")
 
-    # ADMIN MENU
+    # ========= ADMIN PANEL =========
     elif text == "➕ Add Reseller":
-        s["add"] = {}
-        await update.message.reply_text("Name?")
+        s["add_reseller"] = {}
+        await update.message.reply_text("Enter Name:")
 
-    elif "add" in s:
-        a = s["add"]
+    elif "add_reseller" in s:
+        ar = s["add_reseller"]
 
-        if "name" not in a:
-            a["name"] = text
-            await update.message.reply_text("Number?")
+        if "name" not in ar:
+            ar["name"] = text
+            await update.message.reply_text("Enter Number:")
 
-        elif "number" not in a:
-            a["number"] = text
-            await update.message.reply_text("Password?")
+        elif "number" not in ar:
+            ar["number"] = text
+            await update.message.reply_text("Enter Password:")
 
-        else:
-            a["password"] = text
-            db.reference("resellers").push(a)
-            await update.message.reply_text("✅ Reseller Added 🎉")
-            del s["add"]
+        elif "password" not in ar:
+            ar["password"] = text
+            db.reference("resellers").push(ar)
+            await update.message.reply_text("✅ Reseller Added")
+            del s["add_reseller"]
 
-    # NOTIFICATION
-    elif text == "📢 Notification":
-        s["noti"] = {}
-        await update.message.reply_text("Title?")
+    elif text == "📢 Send Notification":
+        s["notify"] = {}
+        await update.message.reply_text("Enter Title:")
 
-    elif "noti" in s:
-        n = s["noti"]
+    elif "notify" in s:
+        n = s["notify"]
 
         if "title" not in n:
             n["title"] = text
-            await update.message.reply_text("Description?")
+            await update.message.reply_text("Enter Description:")
 
         elif "desc" not in n:
             n["desc"] = text
-            await update.message.reply_text("Image URL or skip")
+            await update.message.reply_text("Send Image URL or type skip")
 
-        else:
+        elif "img" not in n:
             n["img"] = text if text != "skip" else ""
             n["time"] = int(time.time())
+
             db.reference("notifications").push(n)
+            await update.message.reply_text("✅ Notification Sent")
+            del s["notify"]
 
-            # Send to all resellers
-            resellers = db.reference("resellers").get()
-            if resellers:
-                for r in resellers.values():
-                    try:
-                        await context.bot.send_message(
-                            chat_id=r.get("chat_id"),
-                            text=f"📢 {n['title']}\n{n['desc']}"
-                        )
-                    except:
-                        pass
-
-            await update.message.reply_text("✅ Sent")
-            del s["noti"]
-
-    # TRACKING
     elif text == "📊 Tracking":
         data = db.reference("tracking").get()
-        msg = "📡 Live Users:\n\n"
+        msg = "📡 Live Tracking:\n\n"
 
         if data:
             for k, v in data.items():
@@ -119,10 +107,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(msg)
 
-    # RESELLER LOGIN
+    # ========= RESELLER LOGIN =========
     elif s.get("role") == "reseller" and not s.get("number"):
         s["number"] = text
-        await update.message.reply_text("Password?")
+        await update.message.reply_text("Enter Password:")
 
     elif s.get("role") == "reseller" and not s.get("login"):
         data = db.reference("resellers").get()
@@ -130,61 +118,88 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for k, v in data.items():
             if v["number"] == s["number"] and v["password"] == text:
                 s["login"] = True
-                s["id"] = k
-
-                # save chat_id
-                db.reference(f"resellers/{k}/chat_id").set(uid)
-
+                s["reseller_id"] = k
                 await reseller_panel(update)
                 return
 
         await update.message.reply_text("❌ Login Failed")
 
-    # ADD CLIENT
+    # ========= ADD CLIENT =========
     elif text == "➕ Add Client":
         s["client"] = {}
-        await update.message.reply_text("Client Name?")
+        await update.message.reply_text("Client Name:")
 
     elif "client" in s:
         c = s["client"]
 
         if "name" not in c:
             c["name"] = text
-            await update.message.reply_text("Number?")
+            await update.message.reply_text("Client Number:")
 
-        else:
+        elif "number" not in c:
             c["number"] = text
-            uidc = str(uuid.uuid4())[:8]
+            uid = str(uuid.uuid4())[:8]
 
-            m3u = f"https://mitv-tan.vercel.app/api/m3u?user={uidc}"
+            m3u = f"https://mitv-tan.vercel.app/api/m3u?user={uid}"
 
-            db.reference(f"clients/{s['id']}").push({
+            db.reference(f"clients/{s['reseller_id']}").push({
                 "name": c["name"],
                 "number": c["number"],
-                "m3u": m3u
+                "m3u": m3u,
+                "time": int(time.time())
             })
 
-            msg = f"🔥 MITV\nName: {c['name']}\nNumber: {c['number']}\nM3U: {m3u}"
+            # Post Generate
+            msg = f"""
+🔥 MITV PANEL 🔥
+
+👤 Name: {c['name']}
+📱 Number: {c['number']}
+🔗 M3U: {m3u}
+"""
+
             wa = f"https://wa.me/{c['number']}?text={msg}"
 
             await update.message.reply_text(msg)
-            await update.message.reply_text(f"📤 Send:\n{wa}")
+            await update.message.reply_text(f"📤 WhatsApp Send:\n{wa}")
 
             del s["client"]
 
-# PANELS
+    elif text == "📂 My Clients":
+        data = db.reference(f"clients/{s['reseller_id']}").get()
+
+        msg = "📋 Clients:\n\n"
+        if data:
+            for v in data.values():
+                msg += f"{v['name']} - {v['m3u']}\n"
+
+        await update.message.reply_text(msg)
+
+# ================= PANELS =================
 async def admin_panel(update):
-    kb = [["➕ Add Reseller", "📢 Notification"], ["📊 Tracking"]]
-    await update.message.reply_text("👑 Admin Panel", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
+    kb = [
+        ["➕ Add Reseller", "📢 Send Notification"],
+        ["📊 Tracking"]
+    ]
+    await update.message.reply_text(
+        "👑 Admin Panel",
+        reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True)
+    )
 
 async def reseller_panel(update):
-    kb = [["➕ Add Client"]]
-    await update.message.reply_text("🧑‍💻 Reseller Panel", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
+    kb = [
+        ["➕ Add Client", "📂 My Clients"]
+    ]
+    await update.message.reply_text(
+        "🧑‍💻 Reseller Panel",
+        reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True)
+    )
 
-# RUN
+# ================= MAIN =================
 app = ApplicationBuilder().token(BOT_TOKEN).build()
+
 app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.TEXT, handle))
 
-print("🔥 BOT RUNNING")
+print("🚀 BOT RUNNING...")
 app.run_polling()
