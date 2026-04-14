@@ -1,4 +1,3 @@
-pyrebase4
-cryptography
-requests
-uvloop
+python-telegram-bot==20.7
+firebase-admin==6.5.0
+aiohttp
