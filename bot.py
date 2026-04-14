@@ -63,8 +63,8 @@ from groq import AsyncGroq
 # =======================================================================================
 
 # Bot Tokens & Passwords
-BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN_HERE"
-ADMIN_PASSWORD = "YOUR_SUPER_ADMIN_PASSWORD"
+BOT_TOKEN = "8700778314:AAECDc3KN8BzDD_-4_Clkv0zGxhgC1WRw5g"
+ADMIN_PASSWORD = "123456"
 
 # Firebase Config
 FIREBASE_DB_URL = "https://ramadan-2385b-default-rtdb.firebaseio.com"
