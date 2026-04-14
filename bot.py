@@ -69,7 +69,7 @@ ADMIN_PASSWORD = "YOUR_SUPER_ADMIN_PASSWORD"
 # Firebase Config
 FIREBASE_DB_URL = "https://ramadan-2385b-default-rtdb.firebaseio.com"
 FIREBASE_CRED_PATH = "firebase.json"
-
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_MODEL = "llama3-70b-8192" # Using the most capable and fast LLaMA 3 model on Groq
 
 # Media Assets (GIFs and Logos for UI/UX)
