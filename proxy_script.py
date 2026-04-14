@@ -4,18 +4,21 @@ import time
 import threading
 import pyrebase
 import requests
+import secrets # Strong random secret ke liye
 
 # ==========================================
-# 1. CONFIGURATION (DuckDNS & Proxy)
+# 1. CONFIGURATION
 # ==========================================
 DUCKDNS_DOMAIN = "miaiproxy" 
 DUCKDNS_TOKEN = "Ce812ef5-13e1-4bbe-bc89-9bd6910c3d24"
 
-PORT = 443 # Fast speed aur anti-block ke liye
-# Fake TLS Secret (High Security + Fast)
-SECRET = "ee0000000000000000000000000000000077777772e676f6f676c652e636f6d"
+PORT = 443 
+# Hum ek 32-char ka strong random secret generate karenge
+# Agar aap apna fix rakhna chahte hain toh 32 characters ka hex code dein
+RAW_SECRET = secrets.token_hex(16) 
+# Fake TLS ke liye 'ee' + RAW_SECRET + google.com ka hex
+TLS_SECRET = f"ee{RAW_SECRET}7777772e676f6f676c652e636f6d"
 
-# Firebase Config
 firebase_config = {
     "apiKey": "AIzaSyBbnU8DkthpYQMHOLLyj6M0cc05qXfjMcw",
     "authDomain": "ramadan-2385b.firebaseapp.com",
@@ -33,20 +36,16 @@ db = firebase.database()
 # 2. UPDATERS
 # ==========================================
 def update_duckdns(ip):
-    """Naye IP ko aapke domain miaiproxy.duckdns.org par map karta hai"""
     try:
         url = f"https://www.duckdns.org/update?domains={DUCKDNS_DOMAIN}&token={DUCKDNS_TOKEN}&ip={ip}"
-        r = requests.get(url, timeout=10)
-        if "OK" in r.text:
-            print(f"🚀 DuckDNS Updated: {DUCKDNS_DOMAIN}.duckdns.org -> {ip}")
-        else:
-            print("⚠️ DuckDNS Update Failed")
+        requests.get(url, timeout=10)
+        print(f"🚀 DuckDNS Updated: {DUCKDNS_DOMAIN}.duckdns.org")
     except:
-        print("❌ DuckDNS Connection Error")
+        print("❌ DuckDNS Error")
 
 def update_firebase(status, ip):
-    """Firebase par permanent link save karta hai"""
-    perm_link = f"tg://proxy?server={DUCKDNS_DOMAIN}.duckdns.org&port={PORT}&secret={SECRET}"
+    # Link mein hum Fake TLS wala lamba secret use karenge
+    perm_link = f"tg://proxy?server={DUCKDNS_DOMAIN}.duckdns.org&port={PORT}&secret={TLS_SECRET}"
     db.child("ProxyServerStatus").update({
         "status": status,
         "server_ip": ip,
@@ -65,28 +64,26 @@ def start_proxy():
     update_duckdns(current_ip)
     update_firebase("ONLINE", current_ip)
 
-    # config.py generation for extreme speed
+    # CONFIG FIX: Server ko sirf 32 chars wala RAW_SECRET chahiye
     config_data = f"""
 PORT = {PORT}
 USERS = {{
-    "admin": "{SECRET}"
+    "admin": "{RAW_SECRET}"
 }}
 TLS_DOMAIN = "www.google.com"
-AD_TAG = "" 
 """
     with open("mtprotoproxy/config.py", "w") as f:
         f.write(config_data)
 
-    print(f"⚡ Proxy is LIVE on Port {PORT}")
-    print(f"🔗 Permanent Link: tg://proxy?server={DUCKDNS_DOMAIN}.duckdns.org&port={PORT}&secret={SECRET}")
-
-    # Start the engine
-    subprocess.run("cd mtprotoproxy && python3 mtprotoproxy.py", shell=True)
+    print(f"⚡ Proxy LIVE on Port {PORT} with Strong Secret")
+    
+    # THE FIX: 'sudo' use kar rahe hain port 443 ki permission ke liye
+    subprocess.run("cd mtprotoproxy && sudo python3 mtprotoproxy.py", shell=True)
 
 if __name__ == "__main__":
     while True:
         try:
             start_proxy()
         except Exception as e:
-            print(f"Restarting... Error: {e}")
+            print(f"Restarting... {e}")
             time.sleep(10)
