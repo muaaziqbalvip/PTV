@@ -1,41 +1,43 @@
-name: MiTV Network Pro Bot 24/7
+name: 🌟 MiTV Network Pro (Secure Groq)
 
 on:
   schedule:
-    - cron: '0 */5 * * *' # Har 5 ghante baad restart
+    - cron: '0 */4 * * *' # Har 4 ghante baad auto-refresh
   push:
     branches: [ main ]
-  workflow_dispatch: # Manual start button
+  workflow_dispatch:
 
 jobs:
   mitv-run:
     runs-on: ubuntu-latest
+    name: MiTV Core Engine
+    
     steps:
-      - name: Checkout Code
+      - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install Dependencies
+      - name: 📦 Install Dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install python-telegram-bot==20.8 firebase-admin groq
 
-      - name: Create Firebase Config
-        run: |
-          echo '${{ secrets.FIREBASE_JSON }}' > firebase.json
-
-      - name: Run MiTV Bot with Auto-Restart
+      - name: 🚀 Start MiTV OS (24/7 Mode)
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          PYTHONUNBUFFERED: 1
         run: |
-          # Loop to restart bot if it crashes
+          echo "===================================================="
+          echo "🏢 ORGANIZATION: MUSLIM ISLAM"
+          echo "👨‍💻 FOUNDER: MUAAZ IQBAL (KASUR)"
+          echo "🤖 STATUS: GROQ AI SECURED"
+          echo "===================================================="
+          
           while true; do
-            echo "🚀 Starting MiTV Network Bot..."
-            python bot.py
-            echo "⚠️ Bot crashed or stopped. Restarting in 5 seconds..."
-            sleep 5
+            echo "🕒 Engine Started: $(date)"
+            python bot.py || echo "⚠️ Restarting..."
+            sleep 10
           done
