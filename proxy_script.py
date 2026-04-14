@@ -25,9 +25,6 @@ db = firebase.database()
 # 2. PROXY CONFIGURATION
 # ==========================================
 PORT = 8443
-
-# Agar GitHub Secrets fail ho jaye, toh ye default fake-TLS secret use hoga
-# Hamesha "ee" se shuru karein for high speed & anti-blocking
 DEFAULT_SECRET = "ee1234567890abcdef1234567890abcdef"
 SECRET = os.getenv("TG_SECRET", DEFAULT_SECRET)
 
@@ -35,14 +32,12 @@ SECRET = os.getenv("TG_SECRET", DEFAULT_SECRET)
 # 3. HELPER FUNCTIONS
 # ==========================================
 def get_public_ip():
-    """Server ka real public IP nikalta hai"""
     try:
         return requests.get('https://api.ipify.org', timeout=10).text.strip()
     except:
         return "127.0.0.1"
 
 def update_firebase_status(status, ip):
-    """Firebase Realtime DB par Live Status aur Link Update karta hai"""
     link = f"tg://proxy?server={ip}&port={PORT}&secret={SECRET}"
     try:
         db.child("ProxyServerStatus").set({
@@ -57,7 +52,6 @@ def update_firebase_status(status, ip):
         print(f"❌ Firebase DB Error: {e}")
 
 def log_activity_to_firebase():
-    """Background mein history track karta hai (Har 5 minute)"""
     while True:
         try:
             db.child("ProxyLogs").push({
@@ -67,15 +61,15 @@ def log_activity_to_firebase():
             })
         except:
             pass
-        time.sleep(300) # 5 Minutes wait
+        time.sleep(300)
 
 # ==========================================
-# 4. MAIN PROXY RUNNER
+# 4. MAIN PROXY RUNNER (FIXED)
 # ==========================================
 def run_proxy():
     print("🚀 Setting up Fast Python MTProtoProxy...")
     
-    # Download proxy library (Sirf pehli baar)
+    # 1. Download proxy library
     if not os.path.exists("mtprotoproxy"):
         subprocess.run("git clone https://github.com/alexbers/mtprotoproxy.git", shell=True)
 
@@ -85,16 +79,22 @@ def run_proxy():
     print(f"⚡ Proxy started on Port {PORT}")
     print(f"🔗 Connect Link: tg://proxy?server={public_ip}&port={PORT}&secret={SECRET}")
 
-    # Run command inside the mtprotoproxy folder
-    # Ye python wali proxy sabse fast hai kyunki isme uvloop use hota hai
-    cmd = f"cd mtprotoproxy && python3 mtprotoproxy.py -p {PORT} -s {SECRET}"
+    # 2. --- THE FIX: Create config.py dynamically ---
+    config_content = f"""
+PORT = {PORT}
+USERS = {{
+    "admin": "{SECRET}"
+}}
+"""
+    with open("mtprotoproxy/config.py", "w") as f:
+        f.write(config_content)
+
+    # 3. Run WITHOUT flags (It will automatically read config.py)
+    cmd = "cd mtprotoproxy && python3 mtprotoproxy.py"
     
     try:
         process = subprocess.Popen(cmd, shell=True)
-        
-        # 5 Ghante 30 Minute tak lagatar chalega (GitHub limit cross hone se pehle auto-restart)
-        time.sleep(19800) 
-        
+        time.sleep(19800) # 5.5 Hours
         process.terminate()
         update_firebase_status("RESTARTING...", public_ip)
     except Exception as e:
@@ -105,10 +105,8 @@ def run_proxy():
 # 5. EXECUTION
 # ==========================================
 if __name__ == "__main__":
-    # 1. Background mein Firebase Tracker Start karo
     threading.Thread(target=log_activity_to_firebase, daemon=True).start()
     
-    # 2. Main Proxy ko Hamesha Zinda (Alive) rakhne ka Loop
     while True:
         run_proxy()
         print("🔄 Restarting Proxy Loop to maintain High Speed...")
