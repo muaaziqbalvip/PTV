@@ -1,0 +1,58 @@
+# ================================================================
+#  MiTV 24/7 Live Stream — MASTER CONFIG
+#  Yahan sab kuch set karo: Stream Key, Logo, Bar, Copyright
+#  Files: playlist.json (videos) | bar.json (ticker text)
+# ================================================================
+
+# ── YOUTUBE STREAM ──────────────────────────────────────────────
+stream:
+  youtube_stream_key: "xxxx-xxxx-xxxx-xxxx-xxxx"   # <-- apni YouTube stream key yahan
+  rtmp_url: "rtmp://a.rtmp.youtube.com/live2"
+  resolution: "1280x720"
+  fps: 30
+  video_bitrate: "2500k"
+  audio_bitrate: "128k"
+  buffer_size: "5000k"
+
+# ── LOGO ────────────────────────────────────────────────────────
+logo:
+  enabled: true                                      # true = dikhao | false = band karo
+  url: "https://your-domain.com/logo.png"            # logo image link
+  position: "top-left"                               # top-left | top-right | bottom-left | bottom-right
+  x_offset: 20                                       # side se distance (pixels)
+  y_offset: 20                                       # upar/neeche se distance (pixels)
+  width: 140                                         # logo ki width pixels mein
+  opacity: 0.92                                      # 0.0 = transparent | 1.0 = full
+
+# ── TICKER BAR ──────────────────────────────────────────────────
+bar:
+  enabled: true                                      # true = dikhao | false = band karo
+  position: "bottom"                                 # bottom | top
+  height: 52                                         # bar ki height pixels mein
+  font_size: 28                                      # text ka size
+  scroll_speed: 3                                    # 1=slow | 3=medium | 6=fast
+  animation: "scroll"                                # scroll (abhi sirf scroll supported)
+
+# ── COPYRIGHT PROTECTION ────────────────────────────────────────
+copyright:
+  enabled: true
+  zoom_factor: 1.03                                  # thora zoom (1.01 - 1.05 recommended)
+  audio_pitch_semitones: -1                          # audio pitch shift (-2 to +2)
+  brightness_adjust: 0.015                           # brightness tweak (0.01 - 0.03)
+
+# ── FILES ───────────────────────────────────────────────────────
+files:
+  playlist: "playlist.json"                          # video links file
+  bar: "bar.json"                                    # ticker text file
+  log: "logs/stream.log"
+
+# ── RETRY / RESTART LOGIC ───────────────────────────────────────
+retry:
+  max_per_item: 5                                    # ek video fail ho to kitni baar retry
+  delay_seconds: 5                                   # retry se pehle wait
+  crash_restart_seconds: 10                          # crash ke baad restart delay
+
+# ── CONFIG HOT-RELOAD ───────────────────────────────────────────
+hot_reload:
+  enabled: true
+  check_interval_seconds: 10                         # kitne seconds mein config check karo
