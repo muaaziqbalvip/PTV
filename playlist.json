@@ -43,11 +43,11 @@
     "text_color": "#000000",
     "font_size": 30,
     "speed": 90,
-    "text": "🔥 LIVE Islamic Stream • Welcome Everyone • سبحان الله • LIKE & SUBSCRIBE ❤️"
+    "text": "🔥 LIVE Islamic Stream • Welcome Everyone • سبحان الله • LIKE & SUBSCRIBE ❤️ IL LIKE IT"
   },
 
   "effects": {
-    "zoom": 1.03,
-    "audio_pitch": 1.02
+    "zoom": 2.03,
+    "audio_pitch": 5.02
   }
 }
