@@ -1,4 +1,4 @@
-name: 24-7 YouTube Live Stream
+name: 24-7 YouTube Live Stream (YouTube + MP4)
 
 on:
   workflow_dispatch:
@@ -17,7 +17,15 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y ffmpeg jq wget fonts-dejavu-core
+          sudo apt-get install -y \
+            ffmpeg \
+            jq \
+            wget \
+            fonts-dejavu-core \
+            python3-pip
+          
+          # Install yt-dlp for YouTube stream capture
+          pip install yt-dlp --quiet
 
       - name: Verify Stream Key
         run: |
@@ -27,9 +35,29 @@ jobs:
           fi
           echo "Stream key found. OK."
 
+      - name: Verify Playlist
+        run: |
+          if [ ! -f "playlist.json" ]; then
+            echo "ERROR: playlist.json not found!"
+            exit 1
+          fi
+          jq . playlist.json > /dev/null
+          echo "Playlist validated. OK."
+
+      - name: Create Temp Directories
+        run: |
+          mkdir -p /tmp/mitv_stream/cache
+          chmod -R 777 /tmp/mitv_stream
+
       - name: Start Live Stream
         env:
           STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
         run: |
           chmod +x stream.sh
           bash stream.sh
+
+      - name: Cleanup on Failure
+        if: failure()
+        run: |
+          rm -rf /tmp/mitv_stream/cache/*
+          echo "Cache cleaned on failure"
