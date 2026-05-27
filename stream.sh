@@ -26,10 +26,9 @@ if [[ "$LOGO_PATH" == http* ]]; then
   LOGO_PATH="/tmp/logo_raw.png"
 fi
 
-# Pre-process logo: add white glow border for shining base
+# Pre-process logo: add white glow using ImageMagick
 LOGO_PROCESSED="/tmp/logo_ready.png"
 if command -v convert &>/dev/null; then
-  # ImageMagick: add soft white halo glow around logo
   convert "$LOGO_PATH" \
     \( +clone -alpha extract \
        -morphology Dilate Disk:8 \
@@ -37,7 +36,8 @@ if command -v convert &>/dev/null; then
        -level 0%,50% \
     \) \
     -compose Screen -composite \
-    "$LOGO_PROCESSED" 2>/dev/null && echo "[LOGO] Glow pre-processed OK" \
+    "$LOGO_PROCESSED" 2>/dev/null \
+  && echo "[LOGO] Glow pre-processed OK" \
   || cp "$LOGO_PATH" "$LOGO_PROCESSED"
 else
   cp "$LOGO_PATH" "$LOGO_PROCESSED"
@@ -55,21 +55,21 @@ while true; do
 
   for VIDEO in "${VIDEOS[@]}"; do
 
-    # Read config fresh each iteration (hot-reload support)
-    LOGO_ENABLED=$(jq -r '.logo.enabled'            "$PLAYLIST")
-    LOGO_WIDTH=$(jq -r '.logo.width'                "$PLAYLIST")
-    LOGO_POSITION=$(jq -r '.logo.position'          "$PLAYLIST")
+    # Read config fresh each iteration
+    LOGO_ENABLED=$(jq -r '.logo.enabled'           "$PLAYLIST")
+    LOGO_WIDTH=$(jq -r '.logo.width'               "$PLAYLIST")
+    LOGO_POSITION=$(jq -r '.logo.position'         "$PLAYLIST")
 
-    TICKER_ENABLED=$(jq -r '.ticker.enabled'        "$PLAYLIST")
-    TICKER_HEIGHT=$(jq -r '.ticker.height'          "$PLAYLIST")
-    TICKER_BG=$(jq -r '.ticker.background_color'    "$PLAYLIST")
-    TICKER_FG=$(jq -r '.ticker.text_color'          "$PLAYLIST")
-    TICKER_SIZE=$(jq -r '.ticker.font_size'         "$PLAYLIST")
-    TICKER_SPEED=$(jq -r '.ticker.speed'            "$PLAYLIST")
-    TICKER_TEXT=$(jq -r '.ticker.text'              "$PLAYLIST")
+    TICKER_ENABLED=$(jq -r '.ticker.enabled'       "$PLAYLIST")
+    TICKER_HEIGHT=$(jq -r '.ticker.height'         "$PLAYLIST")
+    TICKER_BG=$(jq -r '.ticker.background_color'   "$PLAYLIST")
+    TICKER_FG=$(jq -r '.ticker.text_color'         "$PLAYLIST")
+    TICKER_SIZE=$(jq -r '.ticker.font_size'        "$PLAYLIST")
+    TICKER_SPEED=$(jq -r '.ticker.speed'           "$PLAYLIST")
+    TICKER_TEXT=$(jq -r '.ticker.text'             "$PLAYLIST")
 
-    ZOOM=$(jq -r '.effects.zoom'                    "$PLAYLIST")
-    PITCH=$(jq -r '.effects.audio_pitch'            "$PLAYLIST")
+    ZOOM=$(jq -r '.effects.zoom'                   "$PLAYLIST")
+    PITCH=$(jq -r '.effects.audio_pitch'           "$PLAYLIST")
 
     # ── Logo Position ──
     case "$LOGO_POSITION" in
@@ -80,21 +80,19 @@ while true; do
       *)              OVR="main_w-overlay_w-18:18" ;;
     esac
 
-    # ── Build filter_complex ──────────────────────────
-    # Logo shining animation using lut + sine wave brightness pulse
-    # sin(2*PI*t * speed) oscillates between 0 and 1 → creates glow pulse
-    SHINE_SPEED="1.2"   # pulses per second
-    SHINE_MIN="0.75"    # minimum brightness (0.0–1.0)
-    SHINE_MAX="1.0"     # max brightness at peak shine
+    # ── Shine animation settings ──
+    SHINE_SPEED="1.2"
+    SHINE_MIN="0.72"
+    SHINE_MAX="1.0"
 
+    # ── Build filter_complex ──
     FC=""
-    INPUTS=(-re -stream_loop -1 -i "$VIDEO")
+    LOGO_INPUT_FLAG=""
 
     if [ "$LOGO_ENABLED" = "true" ] && [ -f "$LOGO_PATH" ]; then
-      INPUTS+=(-i "$LOGO_PATH")
+      LOGO_INPUT_FLAG="-i $LOGO_PATH"
 
-      # Scale logo → apply shine pulse via lut (eq brightness) using geq
-      # geq applies per-pixel expression; sine oscillation on luma channel
+      # Scale + sine-wave brightness pulse (shine effect)
       FC="[1:v]scale=${LOGO_WIDTH}:-1,"
       FC+="geq="
       FC+="r='r(X,Y)*clip(${SHINE_MIN}+(${SHINE_MAX}-${SHINE_MIN})*0.5*(1+sin(2*3.14159*${SHINE_SPEED}*T)),0,1)':"
@@ -102,53 +100,30 @@ while true; do
       FC+="b='b(X,Y)*clip(${SHINE_MIN}+(${SHINE_MAX}-${SHINE_MIN})*0.5*(1+sin(2*3.14159*${SHINE_SPEED}*T)),0,1)':"
       FC+="a='alpha(X,Y)'"
       FC+="[logo_shine];"
-
-      # White flash ring effect (optional shimmer overlay)
-      # Composite shining logo onto video
       FC+="[0:v][logo_shine]overlay=${OVR}:format=auto[with_logo];"
       BASE="[with_logo]"
     else
       BASE="[0:v]"
     fi
 
-    # Zoom + crop (subtle cinematic zoom)
+    # Zoom + crop
     FC+="${BASE}scale=iw*${ZOOM}:ih*${ZOOM},crop=iw/${ZOOM}:ih/${ZOOM}"
 
-    # Ticker bar
+    # Ticker
     if [ "$TICKER_ENABLED" = "true" ]; then
-      SAFE_TEXT=$(echo "$TICKER_TEXT" | sed "s/[:\\\\':]/\\\\&/g; s/%/%%/g")
-      # Gradient-style ticker using two drawbox layers
-      FC+=",drawbox=x=0:y=ih-${TICKER_HEIGHT}:w=iw:h=${TICKER_HEIGHT}:color=black@0.6:t=fill"
+      SAFE_TEXT=$(printf '%s' "$TICKER_TEXT" | sed "s/[:\\\\':]/\\\\&/g; s/%/%%/g")
+      FC+=",drawbox=x=0:y=ih-${TICKER_HEIGHT}:w=iw:h=${TICKER_HEIGHT}:color=black@0.65:t=fill"
       FC+=",drawbox=x=0:y=ih-${TICKER_HEIGHT}:w=iw:h=3:color=00ff99@1.0:t=fill"
-      FC+=",drawtext="
-      FC+="fontfile='${FONT_PATH}':"
-      FC+="text='${SAFE_TEXT} ★ ${SAFE_TEXT} ★ ${SAFE_TEXT}':"
-      FC+="fontcolor=${TICKER_FG}:"
-      FC+="fontsize=${TICKER_SIZE}:"
-      FC+="x=w-mod(${TICKER_SPEED}*t\\,w+tw):"
-      FC+="y=h-${TICKER_HEIGHT}+10:"
-      FC+="shadowcolor=black@0.8:shadowx=1:shadowy=1"
+      FC+=",drawtext=fontfile='${FONT_PATH}':text='${SAFE_TEXT}  ✦  ${SAFE_TEXT}':fontcolor=${TICKER_FG}:fontsize=${TICKER_SIZE}:x=w-mod(${TICKER_SPEED}*t\\,w+tw):y=h-${TICKER_HEIGHT}+10:shadowcolor=black@0.8:shadowx=1:shadowy=1"
     fi
 
     FC+="[vout]"
 
-    # ── Map flags ──
-    MAP_V="-map [vout]"
-    MAP_A="-map 0:a?"   # '?' = don't fail if no audio track
-
     echo ""
-    echo "▶ Streaming: $VIDEO"
-    echo "  $(date)"
+    echo "▶  Streaming: $VIDEO"
+    echo "   $(date)"
 
-    # ── FFmpeg Command ─────────────────────────────────
-    # Speed optimizations:
-    #  -preset ultrafast   → lowest CPU, fastest encode
-    #  -tune zerolatency   → minimizes buffering for live
-    #  -threads 0          → auto-detect all CPU cores
-    #  -fflags +genpts+discardcorrupt → handle corrupt frames
-    #  -err_detect ignore_err → skip bad packets
-    #  -probesize 5M / -analyzeduration 5M → fast source probe
-
+    # ── FFmpeg — Optimized for Speed + Quality ──
     ffmpeg \
       -hide_banner \
       -loglevel warning \
@@ -157,10 +132,13 @@ while true; do
       -err_detect ignore_err \
       -probesize 5M \
       -analyzeduration 5M \
-      "${INPUTS[@]}" \
+      -re \
+      -stream_loop -1 \
+      -i "$VIDEO" \
+      $LOGO_INPUT_FLAG \
       -filter_complex "$FC" \
-      $MAP_V \
-      $MAP_A \
+      -map "[vout]" \
+      -map "0:a?" \
       -af "asetrate=44100*${PITCH},aresample=44100,volume=1.2,loudnorm" \
       -c:v libx264 \
       -preset ultrafast \
@@ -186,21 +164,20 @@ while true; do
     && FAIL_COUNT=0 \
     || {
         FAIL_COUNT=$((FAIL_COUNT + 1))
-        echo "⚠️  FFmpeg failed (attempt $FAIL_COUNT/$MAX_FAILS)"
+        echo "⚠️  FFmpeg error (attempt $FAIL_COUNT / $MAX_FAILS)"
         if [ "$FAIL_COUNT" -ge "$MAX_FAILS" ]; then
-          echo "❌ Too many failures. Waiting 60s before retry..."
+          echo "❌ Max failures hit. Cooling down 60s..."
           sleep 60
           FAIL_COUNT=0
         fi
       }
 
-    echo "⏭ Next video in 3s..."
+    echo "⏭  Next video in 3s..."
     sleep 3
 
   done
 
-  echo ""
-  echo "🔁 Playlist complete — restarting loop"
+  echo "🔁 Playlist looped — restarting..."
   sleep 2
 
 done
