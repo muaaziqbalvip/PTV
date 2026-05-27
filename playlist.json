@@ -32,7 +32,7 @@
   "logo": {
     "enabled": true,
     "path": "https://i.ibb.co/C5WBZ6Yc/file-00000000305071fa945b58b012ac072b.png",
-    "position": "top-right",
+    "position": "top-left",
     "width": 180
   },
 
@@ -47,7 +47,7 @@
   },
 
   "effects": {
-    "zoom": 2.03,
-    "audio_pitch": 5.02
+    "zoom": 1.05,
+    "audio_pitch": 0.09
   }
 }
