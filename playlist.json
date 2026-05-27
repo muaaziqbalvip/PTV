@@ -1,24 +1,35 @@
-[
-  {
-    "type": "mp4",
-    "url": "https://example.com/video1.mp4",
-    "title": "Video 1"
+{
+  "videos": [
+    {
+      "url": "https://example.com/video1.mp4"
+    },
+    {
+      "url": "https://example.com/video2.m3u8"
+    },
+    {
+      "url": "https://example.com/video3.mp4"
+    }
+  ],
+
+  "logo": {
+    "enabled": true,
+    "path": "logo.png",
+    "position": "top-right",
+    "width": 180
   },
-  {
-    "type": "mp4",
-    "url": "https://example.com/video2.mp4",
-    "title": "Video 2"
+
+  "ticker": {
+    "enabled": true,
+    "height": 55,
+    "background_color": "#00ff99",
+    "text_color": "#000000",
+    "font_size": 30,
+    "speed": 90,
+    "text": "🔥 LIVE Islamic Stream • Welcome Everyone • سبحان الله • LIKE & SUBSCRIBE ❤️"
   },
-  {
-    "type": "m3u8",
-    "url": "https://example.com/channel.m3u8",
-    "title": "Live Channel",
-    "duration": 300
-  },
-  {
-    "type": "youtube",
-    "url": "https://www.youtube.com/watch?v=VIDEO_ID",
-    "title": "YouTube Video",
-    "duration": 600
+
+  "effects": {
+    "zoom": 1.03,
+    "audio_pitch": 1.02
   }
-]
+}
