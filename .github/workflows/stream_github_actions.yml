@@ -1,0 +1,284 @@
+name: 🔴 MiTV 24/7 Live Stream Deployment
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'config.yml'
+      - 'playlist.json'
+      - 'bar.json'
+      - 'workflow.js'
+      - '.github/workflows/stream.yml'
+  workflow_dispatch:  # manual trigger
+  schedule:
+    - cron: '0 */6 * * *'  # har 6 ghante check karo
+
+env:
+  REPO: mitv-stream
+  SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+  SSH_HOST: ${{ secrets.SSH_HOST }}
+  SSH_USER: ${{ secrets.SSH_USER }}
+  SSH_PORT: ${{ secrets.SSH_PORT }}
+
+jobs:
+
+  # ────────────────────────────────────────────────────────────
+  #  BUILD & VERIFY
+  # ────────────────────────────────────────────────────────────
+  verify:
+    name: 📋 Verify Config Files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check config.yml syntax
+        run: |
+          if ! command -v yamllint &> /dev/null; then
+            pip install yamllint
+          fi
+          yamllint config.yml || exit 1
+          echo "✓ config.yml syntax OK"
+
+      - name: Check JSON files
+        run: |
+          python3 -m json.tool playlist.json > /dev/null && echo "✓ playlist.json OK"
+          python3 -m json.tool bar.json > /dev/null && echo "✓ bar.json OK"
+
+      - name: Check workflow.js
+        run: |
+          if ! node -c workflow.js 2>&1; then
+            echo "❌ workflow.js syntax error"
+            exit 1
+          fi
+          echo "✓ workflow.js syntax OK"
+
+  # ────────────────────────────────────────────────────────────
+  #  DEPLOY TO SERVER
+  # ────────────────────────────────────────────────────────────
+  deploy:
+    name: 🚀 Deploy & Start Stream
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ env.SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p ${{ env.SSH_PORT }} ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: 📤 Upload files to server
+        run: |
+          scp -P ${{ env.SSH_PORT }} \
+            config.yml \
+            playlist.json \
+            bar.json \
+            workflow.js \
+            docker-compose.yml \
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:/home/${{ env.SSH_USER }}/${{ env.REPO }}/
+
+      - name: 🔧 Install Dependencies (FFmpeg, Node.js, Docker)
+        run: |
+          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} << 'SETUP_EOF'
+          set -e
+          
+          echo "[SETUP] Installing dependencies..."
+          sudo apt-get update -qq
+          
+          # FFmpeg
+          if ! command -v ffmpeg &> /dev/null; then
+            echo "[SETUP] Installing FFmpeg..."
+            sudo apt-get install -y -qq ffmpeg
+          fi
+          
+          # Node.js
+          if ! command -v node &> /dev/null; then
+            echo "[SETUP] Installing Node.js..."
+            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+            sudo apt-get install -y -qq nodejs
+          fi
+          
+          # Docker
+          if ! command -v docker &> /dev/null; then
+            echo "[SETUP] Installing Docker..."
+            curl -fsSL https://get.docker.com -o get-docker.sh
+            sudo bash get-docker.sh
+            sudo usermod -aG docker $USER || true
+          fi
+          
+          # yt-dlp
+          if ! command -v yt-dlp &> /dev/null; then
+            echo "[SETUP] Installing yt-dlp..."
+            sudo curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
+            sudo chmod +x /usr/local/bin/yt-dlp
+          fi
+          
+          echo "[SETUP] ✓ All dependencies installed"
+          SETUP_EOF
+
+      - name: 📁 Create project directories
+        run: |
+          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} << 'DIR_EOF'
+          mkdir -p /home/${{ env.SSH_USER }}/${{ env.REPO }}
+          mkdir -p /home/${{ env.SSH_USER }}/${{ env.REPO }}/logs
+          mkdir -p /tmp/mitv
+          chmod -R 755 /home/${{ env.SSH_USER }}/${{ env.REPO }}
+          echo "[DIRS] ✓ Directories created"
+          DIR_EOF
+
+      - name: 🐳 Stop any running stream
+        continue-on-error: true
+        run: |
+          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} << 'STOP_EOF'
+          cd /home/${{ env.SSH_USER }}/${{ env.REPO }}
+          
+          # Kill existing processes
+          pkill -f "node workflow.js" || true
+          pkill -f "ffmpeg" || true
+          
+          # Stop docker if running
+          if command -v docker &> /dev/null; then
+            docker compose down 2>/dev/null || true
+          fi
+          
+          echo "[STOP] ✓ Old processes stopped"
+          STOP_EOF
+
+      - name: ▶️ Start 24/7 Stream
+        run: |
+          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} << 'START_EOF'
+          cd /home/${{ env.SSH_USER }}/${{ env.REPO }}
+          
+          # Validate config first
+          echo "[VALIDATE] Checking config.yml..."
+          if ! python3 -c "import yaml; yaml.safe_load(open('config.yml'))" 2>/dev/null; then
+            echo "❌ config.yml invalid - aborting"
+            exit 1
+          fi
+          
+          echo "[VALIDATE] ✓ Config valid"
+          
+          # Start with Docker
+          if command -v docker &> /dev/null; then
+            echo "[START] Starting with Docker Compose..."
+            docker compose up -d --remove-orphans
+            sleep 2
+            docker compose logs --tail=20
+          else
+            # Fallback: bare Node.js
+            echo "[START] Docker not available - starting with Node.js..."
+            nohup npm install --silent 2>/dev/null && node workflow.js > logs/stream.log 2>&1 &
+            sleep 2
+            tail -n 20 logs/stream.log
+          fi
+          
+          echo "[START] ✓ Stream started"
+          echo "[INFO] Check status: tail -f logs/stream.log"
+          START_EOF
+
+      - name: ✅ Verify Stream is Running
+        run: |
+          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} << 'VERIFY_EOF'
+          cd /home/${{ env.SSH_USER }}/${{ env.REPO }}
+          
+          sleep 3
+          
+          if command -v docker &> /dev/null && docker ps | grep mitv_stream > /dev/null; then
+            echo "✓ Docker container running"
+            docker ps --filter "name=mitv"
+          elif pgrep -f "node workflow.js" > /dev/null; then
+            echo "✓ Node.js process running"
+            ps aux | grep workflow.js | grep -v grep
+          else
+            echo "⚠️ Stream process not found - check logs"
+            tail -n 50 logs/stream.log || true
+          fi
+          VERIFY_EOF
+
+  # ────────────────────────────────────────────────────────────
+  #  MONITORING & NOTIFICATIONS
+  # ────────────────────────────────────────────────────────────
+  monitor:
+    name: 📊 Check Stream Health
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+
+      - name: 🔍 Check if stream is alive
+        run: |
+          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} << 'MONITOR_EOF'
+          cd /home/${{ env.SSH_USER }}/${{ env.REPO }}
+          
+          echo "[MONITOR] Checking heartbeat..."
+          if [ -f "logs/heartbeat" ]; then
+            HEARTBEAT_TIME=$(cat logs/heartbeat)
+            NOW=$(date +%s)000
+            AGE=$((NOW - HEARTBEAT_TIME))
+            if [ "$AGE" -lt 30000 ]; then
+              echo "✓ Stream healthy (heartbeat: ${AGE}ms ago)"
+            else
+              echo "⚠️ Stream stale (heartbeat: ${AGE}ms ago)"
+            fi
+          else
+            echo "⚠️ No heartbeat file - stream may not have started"
+          fi
+          
+          # Show recent logs
+          echo ""
+          echo "[RECENT LOGS]"
+          tail -n 15 logs/stream.log
+          MONITOR_EOF
+
+      - name: 📧 Notify on Slack (optional)
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": "❌ MiTV Stream Deployment Failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Stream Status*: ❌ Failed\n*Repo*: ${{ github.repository }}\n*Branch*: ${{ github.ref }}"
+                  }
+                }
+              ]
+            }
+
+# ────────────────────────────────────────────────────────────
+#  MANUAL CONTROL WORKFLOW
+# ────────────────────────────────────────────────────────────
+  control:
+    name: 🎮 Stream Control (Restart/Stop)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Restart Stream
+        run: |
+          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} << 'RESTART_EOF'
+          cd /home/${{ env.SSH_USER }}/${{ env.REPO }}
+          
+          echo "[RESTART] Killing old processes..."
+          pkill -f "node workflow.js" || true
+          sleep 2
+          
+          if command -v docker &> /dev/null; then
+            docker compose down
+            docker compose up -d
+          else
+            nohup npm install --silent && node workflow.js > logs/stream.log 2>&1 &
+          fi
+          
+          sleep 2
+          echo "[RESTART] ✓ Stream restarted"
+          RESTART_EOF
