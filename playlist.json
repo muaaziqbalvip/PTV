@@ -1,19 +1,37 @@
 {
   "videos": [
     {
-      "url": "https://example.com/video1.mp4"
+      "url": "https://cdn5.urduflix.pk/NiaziPlay-1/Kurulus-Osman/Urdu-Dubbed/S1/Episode-1.mp4"
     },
     {
-      "url": "https://example.com/video2.m3u8"
+      "url": "https://cdn5.urduflix.pk/NiaziPlay-1/Kurulus-Osman/Urdu-Dubbed/S1/Episode-2.mp4"
     },
     {
-      "url": "https://example.com/video3.mp4"
+      "url": "https://cdn5.urduflix.pk/NiaziPlay-1/Kurulus-Osman/Urdu-Dubbed/S1/Episode-3.mp4"
+    },
+    {
+      "url": "https://cdn5.urduflix.pk/NiaziPlay-1/Kurulus-Osman/Urdu-Dubbed/S1/Episode-4.mp4"
+    },
+    {
+      "url": "https://cdn5.urduflix.pk/NiaziPlay-1/Kurulus-Osman/Urdu-Dubbed/S1/Episode-5.mp4"
+    },
+    {
+      "url": "https://cdn5.urduflix.pk/NiaziPlay-1/Kurulus-Osman/Urdu-Dubbed/S1/Episode-6.mp4"
+    },
+    {
+      "url": "https://cdn5.urduflix.pk/NiaziPlay-1/Kurulus-Osman/Urdu-Dubbed/S1/Episode-7.mp4"
+    },
+    {
+      "url": "https://cdn5.urduflix.pk/NiaziPlay-1/Kurulus-Osman/Urdu-Dubbed/S1/Episode-8.mp4"
+    },
+    {
+      "url": "https://cdn5.urduflix.pk/NiaziPlay-1/Kurulus-Osman/Urdu-Dubbed/S1/Episode-9.mp4"
     }
   ],
 
   "logo": {
     "enabled": true,
-    "path": "logo.png",
+    "path": "https://i.ibb.co/PvXkHhgG/file-00000000305071fa945b58b012ac072b.png",
     "position": "top-right",
     "width": 180
   },
