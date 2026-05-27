@@ -2,7 +2,7 @@
 
 # ╔══════════════════════════════════════════════════╗
 # ║   MiTV Network — 24/7 YouTube Live Stream       ║
-# ║   Upgraded: Logo Shine + Fast Encode + Stable   ║
+# ║   UPGRADED: YouTube Live + MP4 Cast + Fast HD   ║
 # ╚══════════════════════════════════════════════════╝
 
 set -euo pipefail
@@ -11,6 +11,10 @@ YOUTUBE_URL="rtmp://a.rtmp.youtube.com/live2/${STREAM_KEY}"
 PLAYLIST="playlist.json"
 LOGFILE="stream.log"
 FONT_PATH="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+TEMP_DIR="/tmp/mitv_stream"
+CACHE_DIR="$TEMP_DIR/cache"
+
+mkdir -p "$TEMP_DIR" "$CACHE_DIR"
 
 echo "======================================"
 echo "  MiTV 24/7 Live Stream Starting..."
@@ -22,13 +26,15 @@ LOGO_PATH=$(jq -r '.logo.path' "$PLAYLIST")
 
 if [[ "$LOGO_PATH" == http* ]]; then
   echo "[LOGO] Downloading from URL..."
-  wget -q -O /tmp/logo_raw.png "$LOGO_PATH"
-  LOGO_PATH="/tmp/logo_raw.png"
+  wget -q -O "$TEMP_DIR/logo_raw.png" "$LOGO_PATH" 2>/dev/null || {
+    echo "[LOGO] Download failed, using placeholder"
+  }
+  LOGO_PATH="$TEMP_DIR/logo_raw.png"
 fi
 
 # Pre-process logo: add white glow using ImageMagick
-LOGO_PROCESSED="/tmp/logo_ready.png"
-if command -v convert &>/dev/null; then
+LOGO_PROCESSED="$TEMP_DIR/logo_ready.png"
+if command -v convert &>/dev/null && [ -f "$LOGO_PATH" ]; then
   convert "$LOGO_PATH" \
     \( +clone -alpha extract \
        -morphology Dilate Disk:8 \
@@ -38,12 +44,105 @@ if command -v convert &>/dev/null; then
     -compose Screen -composite \
     "$LOGO_PROCESSED" 2>/dev/null \
   && echo "[LOGO] Glow pre-processed OK" \
-  || cp "$LOGO_PATH" "$LOGO_PROCESSED"
+  || cp "$LOGO_PATH" "$LOGO_PROCESSED" 2>/dev/null || true
 else
-  cp "$LOGO_PATH" "$LOGO_PROCESSED"
+  [ -f "$LOGO_PATH" ] && cp "$LOGO_PATH" "$LOGO_PROCESSED" || true
 fi
 
 LOGO_PATH="$LOGO_PROCESSED"
+
+# ── Function: Get Stream URL from YouTube Live Link ──
+get_youtube_stream() {
+  local yt_link="$1"
+  local video_id=$(echo "$yt_link" | grep -oP '(?<=v=|/)[\w-]{11}|(?<=youtu.be/)[\w-]{11}' | head -1)
+  
+  if [ -z "$video_id" ]; then
+    return 1
+  fi
+  
+  # Use youtube-dl / yt-dlp to get direct stream URL
+  if command -v yt-dlp &>/dev/null; then
+    yt-dlp -f "best[ext=mp4]" -g "$yt_link" 2>/dev/null || return 1
+  elif command -v youtube-dl &>/dev/null; then
+    youtube-dl -f "best[ext=mp4]" -g "$yt_link" 2>/dev/null || return 1
+  else
+    return 1
+  fi
+}
+
+# ── Function: Convert YouTube Live to MP4 (Fast Mode) ──
+youtube_to_mp4_fast() {
+  local yt_link="$1"
+  local output_file="$2"
+  
+  echo "[YOUTUBE] Converting live stream to MP4 (fast mode)..."
+  
+  # Use yt-dlp to capture live stream
+  if command -v yt-dlp &>/dev/null; then
+    yt-dlp -f "best[ext=mp4]" \
+      --no-warnings \
+      -o "$output_file" \
+      --quiet \
+      "$yt_link" 2>/dev/null && return 0
+  fi
+  
+  return 1
+}
+
+# ── Function: Fast MP4 Re-encode (Preserve Quality) ──
+optimize_mp4_for_stream() {
+  local input_file="$1"
+  local output_file="$2"
+  
+  echo "[MP4] Optimizing for streaming (fast encode)..."
+  
+  ffmpeg -hide_banner -loglevel warning \
+    -i "$input_file" \
+    -c:v libx264 \
+    -preset veryfast \
+    -tune zerolatency \
+    -crf 23 \
+    -b:v 3500k \
+    -maxrate 4500k \
+    -bufsize 8000k \
+    -c:a aac \
+    -b:a 192k \
+    -ar 44100 \
+    -ac 2 \
+    -movflags +faststart \
+    "$output_file" 2>>"$LOGFILE"
+}
+
+# ── Function: Process Video URL ──
+get_video_url() {
+  local input_url="$1"
+  
+  # Check if it's a YouTube live link
+  if [[ "$input_url" == *"youtube.com/live"* ]] || [[ "$input_url" == *"youtu.be"* ]]; then
+    echo "[VIDEO] YouTube Live detected, converting to MP4..."
+    
+    local cache_file="$CACHE_DIR/$(echo "$input_url" | md5sum | cut -d' ' -f1).mp4"
+    
+    if [ -f "$cache_file" ]; then
+      echo "[CACHE] Using cached MP4"
+      echo "$cache_file"
+    else
+      local temp_mp4="$TEMP_DIR/youtube_$(date +%s).mp4"
+      
+      if youtube_to_mp4_fast "$input_url" "$temp_mp4"; then
+        optimize_mp4_for_stream "$temp_mp4" "$cache_file"
+        rm -f "$temp_mp4"
+        echo "$cache_file"
+      else
+        echo "[ERROR] Failed to convert YouTube live to MP4" >&2
+        return 1
+      fi
+    fi
+  else
+    # Regular MP4/M3U link
+    echo "$input_url"
+  fi
+}
 
 # ── Main Stream Loop ─────────────────────────────────
 FAIL_COUNT=0
@@ -70,6 +169,13 @@ while true; do
 
     ZOOM=$(jq -r '.effects.zoom'                   "$PLAYLIST")
     PITCH=$(jq -r '.effects.audio_pitch'           "$PLAYLIST")
+
+    # ── Get actual video URL (handle YouTube Live) ──
+    ACTUAL_VIDEO=$(get_video_url "$VIDEO") || {
+      echo "⚠️  Could not process video URL: $VIDEO"
+      sleep 5
+      continue
+    }
 
     # ── Logo Position ──
     case "$LOGO_POSITION" in
@@ -120,10 +226,10 @@ while true; do
     FC+="[vout]"
 
     echo ""
-    echo "▶  Streaming: $VIDEO"
+    echo "▶  Streaming: $ACTUAL_VIDEO"
     echo "   $(date)"
 
-    # ── FFmpeg — Optimized for Speed + Quality ──
+    # ── FFmpeg — Optimized for Speed + HD Quality ──
     ffmpeg \
       -hide_banner \
       -loglevel warning \
@@ -134,7 +240,7 @@ while true; do
       -analyzeduration 5M \
       -re \
       -stream_loop -1 \
-      -i "$VIDEO" \
+      -i "$ACTUAL_VIDEO" \
       $LOGO_INPUT_FLAG \
       -filter_complex "$FC" \
       -map "[vout]" \
