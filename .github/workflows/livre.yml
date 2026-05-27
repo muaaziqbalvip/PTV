@@ -14,12 +14,20 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v4
 
-      - name: Install FFmpeg
+      - name: Install Dependencies
         run: |
-          sudo apt update
-          sudo apt install ffmpeg -y
+          sudo apt-get update -y
+          sudo apt-get install -y ffmpeg jq wget fonts-dejavu-core
 
-      - name: Start Infinite Live Stream
+      - name: Verify Stream Key
+        run: |
+          if [ -z "${{ secrets.YOUTUBE_STREAM_KEY }}" ]; then
+            echo "ERROR: YOUTUBE_STREAM_KEY secret is not set!"
+            exit 1
+          fi
+          echo "Stream key found. OK."
+
+      - name: Start Live Stream
         env:
           STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
         run: |
