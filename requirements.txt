@@ -1,15 +1,18 @@
 # =============================================
 # 24/7 YouTube Live Stream - Requirements
 # =============================================
-# These are system-level dependencies installed
-# via apt-get in the GitHub Actions workflow.
-# No Python packages are required.
+# System and Python dependencies for streaming
+# with YouTube Live & MP4 support
 
 # --- System Dependencies (Ubuntu/Debian) ---
 # ffmpeg          >= 4.4      (video encoding & streaming)
 # jq              >= 1.6      (JSON parsing for playlist.json)
-# wget            >= 1.21     (logo image download if URL given)
+# wget            >= 1.21     (image/file download)
 # fonts-dejavu-core           (fonts for ffmpeg drawtext ticker)
+# python3-pip                 (Python package manager)
+
+# --- Python Packages (pip install) ---
+# yt-dlp          >= 2024.01  (YouTube stream capture & download)
 
 # --- GitHub Actions ---
 # actions/checkout@v4         (repo checkout)
@@ -23,10 +26,31 @@
 # playlist.json               (video URLs, logo, ticker, effects config)
 # logo.png                    (logo image — OR set logo.path to a URL in playlist.json)
 
-# --- YouTube Live Settings (recommended) ---
-# Resolution : 1280x720 or 1920x1080
-# Frame Rate  : 30fps
-# Video Bitrate: 4500 kbps
-# Audio Bitrate: 192 kbps
-# Encoder     : libx264
-# Stream URL  : rtmp://a.rtmp.youtube.com/live2/<STREAM_KEY>
+# --- YouTube Live Settings (Recommended) ---
+# Resolution        : 1280x720 (720p HD) or 1920x1080 (1080p)
+# Frame Rate        : 30fps (stable) or 60fps (smooth)
+# Video Bitrate     : 4500 kbps (recommended)
+# Audio Bitrate     : 192 kbps
+# Encoder           : libx264 (ultrafast preset for low latency)
+# Stream URL        : rtmp://a.rtmp.youtube.com/live2/<STREAM_KEY>
+
+# --- Supported Video Formats ---
+# ✓ MP4 files (local or remote URLs)
+# ✓ M3U playlists
+# ✓ YouTube Live streams (live/)
+# ✓ YouTube video links (youtu.be, youtube.com)
+
+# --- Performance Notes ---
+# • YouTube live → MP4 conversion uses yt-dlp (fast capture)
+# • MP4 optimization preset: veryfast (balances speed & quality)
+# • FFmpeg encoding: ultrafast + zerolatency (low latency streaming)
+# • Cache: Converted videos cached in /tmp/mitv_stream/cache/
+# • Stream loop: Infinite repeat with 3s transitions
+
+# --- Install Instructions ---
+# 1. Clone repo & cd into it
+# 2. chmod +x stream.sh
+# 3. Add GitHub secret: YOUTUBE_STREAM_KEY
+# 4. Push stream.sh, playlist.json, live.yml, logo.png
+# 5. GitHub Actions will install all dependencies
+# 6. Trigger workflow manually or wait for schedule (every 30 min)
