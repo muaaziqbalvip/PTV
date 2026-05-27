@@ -39,7 +39,7 @@
   "ticker": {
     "enabled": true,
     "height": 55,
-    "background_color": "#00ff99",
+    "background_color": "#00fdcc",
     "text_color": "#000000",
     "font_size": 30,
     "speed": 90,
@@ -48,6 +48,6 @@
 
   "effects": {
     "zoom": 1.05,
-    "audio_pitch": 0.09
+    "audio_pitch": 2.09
   }
 }
