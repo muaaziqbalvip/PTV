@@ -1,3 +1,4 @@
+cat > /mnt/user-data/outputs/stream.sh << 'ENDOFFILE'
 #!/bin/bash
 
 set -euo pipefail
@@ -32,7 +33,6 @@ while true; do
     ZOOM=$(jq -r '.effects.zoom' playlist.json)
     PITCH=$(jq -r '.effects.audio_pitch' playlist.json)
 
-    # --- Logo position mapping ---
     case "$LOGO_POSITION" in
       "top-right")    POSITION="main_w-overlay_w-10:10" ;;
       "top-left")     POSITION="10:10" ;;
@@ -41,22 +41,13 @@ while true; do
       *)              POSITION="10:10" ;;
     esac
 
-    # --- Build FFmpeg inputs and filter_complex separately ---
-    INPUT_ARGS="-re -stream_loop -1 -i \"$VIDEO\""
     FILTER_COMPLEX=""
-    VIDEO_MAP="0:v"
-    AUDIO_MAP="0:a"
 
     if [ "$LOGO_ENABLED" = "true" ] && [ -f "$LOGO_PATH" ]; then
-      INPUT_ARGS+=" -i \"$LOGO_PATH\""
       FILTER_COMPLEX="[1:v]scale=${LOGO_WIDTH}:-1[logo];[0:v][logo]overlay=${POSITION}[ov];"
       FILTER_COMPLEX+="[ov]scale=iw*${ZOOM}:ih*${ZOOM},crop=iw/${ZOOM}:ih/${ZOOM}"
-      VIDEO_MAP="[vout]"
-      LAST_LABEL="[ov]"
     else
       FILTER_COMPLEX="[0:v]scale=iw*${ZOOM}:ih*${ZOOM},crop=iw/${ZOOM}:ih/${ZOOM}"
-      LAST_LABEL="[0:v]scale=iw*${ZOOM}:ih*${ZOOM},crop=iw/${ZOOM}:ih/${ZOOM}"
-      VIDEO_MAP="[vout]"
     fi
 
     if [ "$TICKER_ENABLED" = "true" ]; then
@@ -68,10 +59,12 @@ while true; do
 
     log "Streaming: $VIDEO"
 
-    # Run FFmpeg — if it crashes, log and continue to next video
     if [ "$LOGO_ENABLED" = "true" ] && [ -f "$LOGO_PATH" ]; then
-      ffmpeg -re \
-        -stream_loop -1 \
+      ffmpeg -hide_banner -loglevel warning \
+        -reconnect 1 \
+        -reconnect_streamed 1 \
+        -reconnect_delay_max 5 \
+        -rtbufsize 512m \
         -i "$VIDEO" \
         -i "$LOGO_PATH" \
         -filter_complex "$FILTER_COMPLEX" \
@@ -79,7 +72,7 @@ while true; do
         -map "0:a?" \
         -af "asetrate=44100*${PITCH},aresample=44100" \
         -c:v libx264 \
-        -preset veryfast \
+        -preset ultrafast \
         -tune zerolatency \
         -maxrate 4500k \
         -bufsize 9000k \
@@ -89,17 +82,20 @@ while true; do
         -b:a 192k \
         -ar 44100 \
         -f flv \
-        "$YOUTUBE_URL" || log "FFmpeg exited for $VIDEO — moving to next"
+        "$YOUTUBE_URL" || log "FFmpeg exited — next video..."
     else
-      ffmpeg -re \
-        -stream_loop -1 \
+      ffmpeg -hide_banner -loglevel warning \
+        -reconnect 1 \
+        -reconnect_streamed 1 \
+        -reconnect_delay_max 5 \
+        -rtbufsize 512m \
         -i "$VIDEO" \
         -filter_complex "$FILTER_COMPLEX" \
         -map "[vout]" \
         -map "0:a?" \
         -af "asetrate=44100*${PITCH},aresample=44100" \
         -c:v libx264 \
-        -preset veryfast \
+        -preset ultrafast \
         -tune zerolatency \
         -maxrate 4500k \
         -bufsize 9000k \
@@ -109,12 +105,13 @@ while true; do
         -b:a 192k \
         -ar 44100 \
         -f flv \
-        "$YOUTUBE_URL" || log "FFmpeg exited for $VIDEO — moving to next"
+        "$YOUTUBE_URL" || log "FFmpeg exited — next video..."
     fi
 
     log "Next video..."
-    sleep 3
+    sleep 2
 
   done
 
 done
+ENDOFFILE
