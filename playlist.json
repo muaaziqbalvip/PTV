@@ -1,19 +1,19 @@
 {
   "videos": [
     {
-      "url": "https://manifest.googlevideo.com/api/manifest/hls_playlist/expire/1779978948/ei/ZP4Xao_xLp2svdIPjOPrqAs/ip/103.157.248.247/id/T128OKYIjWc.1/itag/95/source/yt_live_broadcast/requiressl/yes/ratebypass/yes/live/1/sgoap/gir%3Dyes%3Bitag%3D140/sgovp/gir%3Dyes%3Bitag%3D136/rqh/1/hls_chunk_host/rr5---sn-2uja-n3us.googlevideo.com/xpc/EgVo2aDSNQ%3D%3D/bui/AbKmrwrnH1TSEViBkxeHTLWU5R2z2mIX2NDc0vBk0Bx5rgmirViKMfuDQtM4QWABCtJRSzN9I1aNB_kk/spc/96Xrvw1fKioJoRErLshVMmld0Va6js3lx1QH6pv8zz6rKPg8iw/vprv/1/reg/0/playlist_type/DVR/initcwndbps/205000/met/1779957350,/mh/Nu/mm/44/mn/sn-2uja-n3us/ms/lva/mv/m/mvi/5/pl/24/rms/lva,lva/dover/11/pacing/0/keepalive/yes/fexp/51565116,51565682/mt/1779956670/sparams/expire,ei,ip,id,itag,source,requiressl,ratebypass,live,sgoap,sgovp,rqh,xpc,bui,spc,vprv,reg,playlist_type/sig/AHEqNM4wRQIhAMjMCM6SyB4N3cyYet43MTnmrHHzWXhZARP-cCCU3l3MAiAXCBOWnug3DikvYE9tU_Nh_UejefqqFWvbmsNZXAsChQ%3D%3D/lsparams/hls_chunk_host,initcwndbps,met,mh,mm,mn,ms,mv,mvi,pl,rms/lsig/APaTxxMwRQIhAPVl5FU__oLNryatc_Y9ey5uyCAF6iuB22VSIMXAkPcRAiB1D7KXGjV38-2DpqVNynCdvuZKMGj3rty9EeCwMWfghw%3D%3D/playlist/index.m3u8"
+      "url": "https://example.com/video1.mp4"
     },
     {
-      "url": "https://manifest.googlevideo.com/api/manifest/hls_playlist/expire/1779978948/ei/ZP4Xao_xLp2svdIPjOPrqAs/ip/103.157.248.247/id/T128OKYIjWc.1/itag/95/source/yt_live_broadcast/requiressl/yes/ratebypass/yes/live/1/sgoap/gir%3Dyes%3Bitag%3D140/sgovp/gir%3Dyes%3Bitag%3D136/rqh/1/hls_chunk_host/rr5---sn-2uja-n3us.googlevideo.com/xpc/EgVo2aDSNQ%3D%3D/bui/AbKmrwrnH1TSEViBkxeHTLWU5R2z2mIX2NDc0vBk0Bx5rgmirViKMfuDQtM4QWABCtJRSzN9I1aNB_kk/spc/96Xrvw1fKioJoRErLshVMmld0Va6js3lx1QH6pv8zz6rKPg8iw/vprv/1/reg/0/playlist_type/DVR/initcwndbps/205000/met/1779957350,/mh/Nu/mm/44/mn/sn-2uja-n3us/ms/lva/mv/m/mvi/5/pl/24/rms/lva,lva/dover/11/pacing/0/keepalive/yes/fexp/51565116,51565682/mt/1779956670/sparams/expire,ei,ip,id,itag,source,requiressl,ratebypass,live,sgoap,sgovp,rqh,xpc,bui,spc,vprv,reg,playlist_type/sig/AHEqNM4wRQIhAMjMCM6SyB4N3cyYet43MTnmrHHzWXhZARP-cCCU3l3MAiAXCBOWnug3DikvYE9tU_Nh_UejefqqFWvbmsNZXAsChQ%3D%3D/lsparams/hls_chunk_host,initcwndbps,met,mh,mm,mn,ms,mv,mvi,pl,rms/lsig/APaTxxMwRQIhAPVl5FU__oLNryatc_Y9ey5uyCAF6iuB22VSIMXAkPcRAiB1D7KXGjV38-2DpqVNynCdvuZKMGj3rty9EeCwMWfghw%3D%3D/playlist/index.m3u8"
+      "url": "https://example.com/video2.m3u8"
     },
     {
-      "url": "https://www.youtube.com/live/fmyIN0Y2oEc?si=lEWcVFfu8OtUVq5j"
+      "url": "https://example.com/video3.mp4"
     }
   ],
 
   "logo": {
-    "enabled": false,
-    "path": "https://i.ibb.co/N6bdJ1j1/file-00000000246471fa9014d17924d4447a.png",
+    "enabled": true,
+    "path": "logo.png",
     "position": "top-right",
     "width": 180
   },
