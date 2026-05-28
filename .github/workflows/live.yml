@@ -1,3 +1,4 @@
+cat > /mnt/user-data/outputs/live.yml << 'ENDOFFILE'
 name: 24-7 YouTube Live Stream
 
 on:
@@ -39,9 +40,8 @@ jobs:
       - name: Write YouTube Cookies
         run: |
           echo "${{ secrets.YOUTUBE_COOKIES }}" > cookies.txt
-          echo "Cookies file written."
 
-      - name: Resolve YouTube URLs (Fresh Direct Links)
+      - name: Resolve YouTube URLs
         run: |
           python3 - <<'EOF'
           import json, subprocess, sys, os
@@ -56,42 +56,66 @@ jobs:
           resolved = []
           for v in data["videos"]:
               url = v["url"].strip()
-              if not url:
+              if not url or "VIDEO_ID" in url:
+                  print(f"SKIP: placeholder URL — {url}")
                   continue
+
               if "youtube.com" in url or "youtu.be" in url:
                   print(f"Resolving: {url}")
-                  result = subprocess.run(
-                      [
-                          "yt-dlp",
-                          "--cookies", "cookies.txt",
-                          "--js-runtimes", "deno",
-                          "-f", "best[ext=mp4][height<=1080]/best[ext=mp4]/best",
-                          "--get-url",
-                          "--no-playlist",
-                          url
-                      ],
-                      capture_output=True, text=True, env=env
-                  )
+
+                  # Live stream detection
+                  is_live = "/live/" in url
+
+                  if is_live:
+                      # Live streams: get m3u8 HLS URL
+                      result = subprocess.run(
+                          [
+                              "yt-dlp",
+                              "--cookies", "cookies.txt",
+                              "--js-runtimes", "deno",
+                              "-f", "best",
+                              "--get-url",
+                              "--no-playlist",
+                              url
+                          ],
+                          capture_output=True, text=True, env=env
+                      )
+                  else:
+                      # Regular videos: get direct mp4
+                      result = subprocess.run(
+                          [
+                              "yt-dlp",
+                              "--cookies", "cookies.txt",
+                              "--js-runtimes", "deno",
+                              "-f", "best[ext=mp4][height<=1080]/best[ext=mp4]/best",
+                              "--get-url",
+                              "--no-playlist",
+                              url
+                          ],
+                          capture_output=True, text=True, env=env
+                      )
+
                   direct = result.stdout.strip().split("\n")[0]
                   if direct and direct.startswith("http"):
                       resolved.append({"url": direct})
-                      print(f"OK: resolved successfully")
+                      print(f"OK: {'live m3u8' if is_live else 'mp4'} resolved")
                   else:
                       print(f"WARN: Could not resolve {url}")
-                      print(result.stderr[-500:])
+                      print(result.stderr[-300:])
               else:
                   if url.startswith("http"):
                       resolved.append(v)
+                      print(f"OK: direct URL kept — {url}")
 
           if not resolved:
-              print("ERROR: No videos resolved!")
+              print("ERROR: No videos resolved! Check your playlist.json URLs.")
               sys.exit(1)
 
           data["videos"] = resolved
           with open("playlist.json", "w") as f:
               json.dump(data, f, indent=2)
 
-          print(f"Done! {len(resolved)} video(s) ready.")
+          print(f"\nDone! {len(resolved)} video(s) ready to stream.")
           EOF
 
       - name: Start Live Stream
@@ -100,3 +124,4 @@ jobs:
         run: |
           chmod +x stream.sh
           bash stream.sh
+ENDOFFILE
