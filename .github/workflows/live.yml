@@ -17,11 +17,16 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y ffmpeg jq fonts-dejavu-core python3 python3-pip
+          sudo apt-get install -y ffmpeg jq fonts-dejavu-core python3 python3-pip unzip
 
       - name: Install yt-dlp
         run: |
           pip install yt-dlp --break-system-packages
+
+      - name: Install Deno (JS Runtime for yt-dlp)
+        run: |
+          curl -fsSL https://deno.land/install.sh | sh
+          echo "$HOME/.deno/bin" >> $GITHUB_PATH
 
       - name: Verify Stream Key
         run: |
@@ -31,38 +36,52 @@ jobs:
           fi
           echo "Stream key found."
 
+      - name: Write YouTube Cookies
+        run: |
+          echo "${{ secrets.YOUTUBE_COOKIES }}" > cookies.txt
+          echo "Cookies file written."
+
       - name: Resolve YouTube URLs (Fresh Direct Links)
         run: |
           python3 - <<'EOF'
-          import json, subprocess, sys
+          import json, subprocess, sys, os
 
           with open("playlist.json") as f:
               data = json.load(f)
 
+          deno_path = os.path.expanduser("~/.deno/bin")
+          env = os.environ.copy()
+          env["PATH"] = deno_path + ":" + env.get("PATH", "")
+
           resolved = []
           for v in data["videos"]:
-              url = v["url"]
+              url = v["url"].strip()
+              if not url:
+                  continue
               if "youtube.com" in url or "youtu.be" in url:
                   print(f"Resolving: {url}")
                   result = subprocess.run(
                       [
                           "yt-dlp",
+                          "--cookies", "cookies.txt",
+                          "--js-runtimes", "deno",
                           "-f", "best[ext=mp4][height<=1080]/best[ext=mp4]/best",
                           "--get-url",
                           "--no-playlist",
                           url
                       ],
-                      capture_output=True, text=True
+                      capture_output=True, text=True, env=env
                   )
                   direct = result.stdout.strip().split("\n")[0]
                   if direct and direct.startswith("http"):
                       resolved.append({"url": direct})
                       print(f"OK: resolved successfully")
                   else:
-                      print(f"WARN: Could not resolve {url}, skipping")
-                      print(result.stderr)
+                      print(f"WARN: Could not resolve {url}")
+                      print(result.stderr[-500:])
               else:
-                  resolved.append(v)
+                  if url.startswith("http"):
+                      resolved.append(v)
 
           if not resolved:
               print("ERROR: No videos resolved!")
