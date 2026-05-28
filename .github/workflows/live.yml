@@ -3,12 +3,12 @@ name: 24-7 YouTube Live Stream
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "*/25 * * * *"
 
 jobs:
   stream:
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    timeout-minutes: 340
 
     steps:
       - name: Checkout Repo
@@ -16,20 +16,40 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y ffmpeg jq wget fonts-dejavu-core
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg jq curl fonts-dejavu-core fonts-noto fonts-noto-color-emoji
 
-      - name: Verify Stream Key
+      - name: Validate Stream Key
+        env:
+          STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
         run: |
-          if [ -z "${{ secrets.YOUTUBE_STREAM_KEY }}" ]; then
+          if [ -z "$STREAM_KEY" ]; then
             echo "ERROR: YOUTUBE_STREAM_KEY secret is not set!"
             exit 1
           fi
-          echo "Stream key found. OK."
+          echo "Stream key found."
+
+      - name: Validate playlist.json
+        run: |
+          if [ ! -f "playlist.json" ]; then
+            echo "ERROR: playlist.json not found!"
+            exit 1
+          fi
+          jq empty playlist.json && echo "playlist.json is valid JSON"
+
+      - name: Check Logo File
+        run: |
+          LOGO_ENABLED=$(jq -r '.logo.enabled' playlist.json)
+          LOGO_PATH=$(jq -r '.logo.path' playlist.json)
+          if [ "$LOGO_ENABLED" = "true" ] && [ ! -f "$LOGO_PATH" ]; then
+            echo "WARNING: Logo enabled but $LOGO_PATH not found. Disabling logo."
+            jq '.logo.enabled = false' playlist.json > playlist_temp.json && mv playlist_temp.json playlist.json
+          fi
+
+      - name: Make stream.sh Executable
+        run: chmod +x stream.sh
 
       - name: Start Live Stream
         env:
           STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
-        run: |
-          chmod +x stream.sh
-          bash stream.sh
+        run: bash stream.sh
