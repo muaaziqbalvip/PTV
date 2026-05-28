@@ -1,4 +1,3 @@
-cat > /mnt/user-data/outputs/live.yml << 'ENDOFFILE'
 name: 24-7 YouTube Live Stream
 
 on:
@@ -124,4 +123,3 @@ jobs:
         run: |
           chmod +x stream.sh
           bash stream.sh
-ENDOFFILE
