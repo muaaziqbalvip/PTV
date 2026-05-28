@@ -1,16 +1,20 @@
 # ============================================================
-# 24/7 YouTube Live Stream â€” System Requirements
+# 24/7 YouTube Live Stream — System Requirements
 # ============================================================
-# These are installed automatically by the GitHub Actions workflow.
-# If running locally on Ubuntu/Debian, install with:
-#   sudo apt-get install -y $(grep -v '^#' requirements.txt | tr '\n' ' ')
+# Auto-installed by GitHub Actions workflow.
+# Local install: sudo apt-get install -y ffmpeg jq fonts-dejavu-core
+# Python deps:   pip install yt-dlp
 # ============================================================
 
 # Core streaming engine
 ffmpeg
 
-# JSON parser (used in stream.sh to read playlist.json)
+# JSON parser (used in stream.sh)
 jq
 
-# Font package (required by FFmpeg drawtext filter for ticker)
+# Font package (required by FFmpeg drawtext/ticker)
 fonts-dejavu-core
+
+# YouTube URL resolver (Python package)
+# Install: pip install yt-dlp --break-system-packages
+yt-dlp
