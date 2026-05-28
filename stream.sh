@@ -1,4 +1,3 @@
-<< 'ENDOFFILE'
 #!/bin/bash
 
 set -euo pipefail
@@ -114,4 +113,3 @@ while true; do
   done
 
 done
-ENDOFFILE
