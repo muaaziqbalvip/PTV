@@ -3,7 +3,7 @@ name: 24-7 YouTube Live Stream
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "*/25 * * * *"
 
 jobs:
   stream:
@@ -17,7 +17,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y ffmpeg jq wget fonts-dejavu-core
+          sudo apt-get install -y ffmpeg jq fonts-dejavu-core
 
       - name: Verify Stream Key
         run: |
@@ -25,7 +25,7 @@ jobs:
             echo "ERROR: YOUTUBE_STREAM_KEY secret is not set!"
             exit 1
           fi
-          echo "Stream key found. OK."
+          echo "Stream key found."
 
       - name: Start Live Stream
         env:
