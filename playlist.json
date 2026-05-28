@@ -1,35 +1,125 @@
-{
-  "videos": [
-    {
-      "url": "https://youtu.be/wo50hGSNTIE?si=P13tH0eK9YJMFxMa"
-    },
-    {
-      "url": "https://youtu.be/wo50hGSNTIE?si=P13tH0eK9YJMFxMa"
-    },
-    {
-      "url": "https://www.youtube.com/live/BeHszefCnNc?si=U7FNNPjqZLjo9YWd"
-    }
-  ],
+name: 24-7 YouTube Live Stream
 
-  "logo": {
-    "enabled": true,
-    "path": "logo.png",
-    "position": "top-right",
-    "width": 180
-  },
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/25 * * * *"
 
-  "ticker": {
-    "enabled": true,
-    "height": 55,
-    "background_color": "#00ff99",
-    "text_color": "#000000",
-    "font_size": 30,
-    "speed": 90,
-    "text": "🔥 LIVE Islamic Stream • Welcome Everyone • سبحان الله • LIKE & SUBSCRIBE ❤️"
-  },
+jobs:
+  stream:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
 
-  "effects": {
-    "zoom": 1.03,
-    "audio_pitch": 1.02
-  }
-}
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ffmpeg jq fonts-dejavu-core python3 python3-pip unzip
+
+      - name: Install yt-dlp
+        run: |
+          pip install yt-dlp --break-system-packages
+
+      - name: Install Deno (JS Runtime for yt-dlp)
+        run: |
+          curl -fsSL https://deno.land/install.sh | sh
+          echo "$HOME/.deno/bin" >> $GITHUB_PATH
+
+      - name: Verify Stream Key
+        run: |
+          if [ -z "${{ secrets.YOUTUBE_STREAM_KEY }}" ]; then
+            echo "ERROR: YOUTUBE_STREAM_KEY secret is not set!"
+            exit 1
+          fi
+          echo "Stream key found."
+
+      - name: Write YouTube Cookies
+        run: |
+          echo "${{ secrets.YOUTUBE_COOKIES }}" > cookies.txt
+
+      - name: Resolve YouTube URLs
+        run: |
+          python3 - <<'EOF'
+          import json, subprocess, sys, os
+
+          with open("playlist.json") as f:
+              data = json.load(f)
+
+          deno_path = os.path.expanduser("~/.deno/bin")
+          env = os.environ.copy()
+          env["PATH"] = deno_path + ":" + env.get("PATH", "")
+
+          resolved = []
+          for v in data["videos"]:
+              url = v["url"].strip()
+              if not url or "VIDEO_ID" in url:
+                  print(f"SKIP: placeholder URL — {url}")
+                  continue
+
+              if "youtube.com" in url or "youtu.be" in url:
+                  print(f"Resolving: {url}")
+
+                  # Live stream detection
+                  is_live = "/live/" in url
+
+                  if is_live:
+                      # Live streams: get m3u8 HLS URL
+                      result = subprocess.run(
+                          [
+                              "yt-dlp",
+                              "--cookies", "cookies.txt",
+                              "--js-runtimes", "deno",
+                              "-f", "best",
+                              "--get-url",
+                              "--no-playlist",
+                              url
+                          ],
+                          capture_output=True, text=True, env=env
+                      )
+                  else:
+                      # Regular videos: get direct mp4
+                      result = subprocess.run(
+                          [
+                              "yt-dlp",
+                              "--cookies", "cookies.txt",
+                              "--js-runtimes", "deno",
+                              "-f", "best[ext=mp4][height<=1080]/best[ext=mp4]/best",
+                              "--get-url",
+                              "--no-playlist",
+                              url
+                          ],
+                          capture_output=True, text=True, env=env
+                      )
+
+                  direct = result.stdout.strip().split("\n")[0]
+                  if direct and direct.startswith("http"):
+                      resolved.append({"url": direct})
+                      print(f"OK: {'live m3u8' if is_live else 'mp4'} resolved")
+                  else:
+                      print(f"WARN: Could not resolve {url}")
+                      print(result.stderr[-300:])
+              else:
+                  if url.startswith("http"):
+                      resolved.append(v)
+                      print(f"OK: direct URL kept — {url}")
+
+          if not resolved:
+              print("ERROR: No videos resolved! Check your playlist.json URLs.")
+              sys.exit(1)
+
+          data["videos"] = resolved
+          with open("playlist.json", "w") as f:
+              json.dump(data, f, indent=2)
+
+          print(f"\nDone! {len(resolved)} video(s) ready to stream.")
+          EOF
+
+      - name: Start Live Stream
+        env:
+          STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
+        run: |
+          chmod +x stream.sh
+          bash stream.sh
