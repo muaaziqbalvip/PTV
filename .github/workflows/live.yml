@@ -1,43 +1,35 @@
-name: 🌟 MiTV Network Pro (Secure Groq)
+name: 24-7 YouTube Live Stream
 
 on:
-  schedule:
-    - cron: '0 */4 * * *' # Har 4 ghante baad auto-refresh
-  push:
-    branches: [ main ]
   workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
 
 jobs:
-  mitv-run:
+  stream:
     runs-on: ubuntu-latest
-    name: MiTV Core Engine
-    
+    timeout-minutes: 350
+
     steps:
-      - name: 📥 Checkout Repository
+      - name: Checkout Repo
         uses: actions/checkout@v4
 
-      - name: 🐍 Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: 📦 Install Dependencies
+      - name: Install Dependencies
         run: |
-          pip install python-telegram-bot==20.8 firebase-admin groq
+          sudo apt-get update -y
+          sudo apt-get install -y ffmpeg jq wget fonts-dejavu-core
 
-      - name: 🚀 Start MiTV OS (24/7 Mode)
+      - name: Verify Stream Key
+        run: |
+          if [ -z "${{ secrets.YOUTUBE_STREAM_KEY }}" ]; then
+            echo "ERROR: YOUTUBE_STREAM_KEY secret is not set!"
+            exit 1
+          fi
+          echo "Stream key found. OK."
+
+      - name: Start Live Stream
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          PYTHONUNBUFFERED: 1
+          STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
         run: |
-          echo "===================================================="
-          echo "🏢 ORGANIZATION: MUSLIM ISLAM"
-          echo "👨‍💻 FOUNDER: MUAAZ IQBAL (KASUR)"
-          echo "🤖 STATUS: GROQ AI SECURED"
-          echo "===================================================="
-          
-          while true; do
-            echo "🕒 Engine Started: $(date)"
-            python bot.py || echo "⚠️ Restarting..."
-            sleep 10
-          done
+          chmod +x stream.sh
+          bash stream.sh
