@@ -12,8 +12,8 @@
   ],
 
   "logo": {
-    "enabled": true,
-    "path": "https://i.ibb.co/Xxpt0B54/IMG-20260415-223746-removebg-preview.png",
+    "enabled": false,
+    "path": "logo.png",
     "position": "top-right",
     "width": 180
   },
