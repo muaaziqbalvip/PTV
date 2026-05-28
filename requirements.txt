@@ -1,10 +1,49 @@
-# MiTV Network — Live Stream Project Dependencies
-# Python utilities (optional — used for playlist management scripts)
+# =============================================
+# MiTV Network — 24/7 YouTube Live Stream
+# Requirements & Setup Guide
+# =============================================
 
-requests>=2.31.0
-firebase-admin>=6.4.0
-python-dotenv>=1.0.0
-schedule>=1.2.1
-yt-dlp>=2024.1.0
-pillow>=10.2.0
-numpy>=1.26.0
+# ── System Dependencies (apt-get) ────────────
+# ffmpeg              >= 4.4    Video encoding & RTMP streaming
+# jq                  >= 1.6    JSON parsing (playlist.json)
+# wget                >= 1.21   Logo download from URL
+# imagemagick                   Logo glow pre-processing
+# yt-dlp                        YouTube video downloading
+# fonts-dejavu-core             Ticker drawtext font
+# libx264-dev                   H.264 encoder support
+
+# ── GitHub Secrets Required ──────────────────
+# YOUTUBE_STREAM_KEY            From YouTube Studio → Go Live → Stream Key
+
+# ── Repository Files Required ────────────────
+# stream.sh                     Main streaming script
+# playlist.json                 Config: videos, logo, ticker, effects
+# logo.png                      OR set logo.path to a URL in playlist.json
+
+# ── playlist.json logo.path tip ──────────────
+# Option A (file):  "path": "logo.png"        → place logo.png in repo root
+# Option B (URL):   "path": "https://..."     → auto-downloaded at stream start
+
+# ── Encoding Specs ───────────────────────────
+# Resolution    : Source (pass-through, scaled by zoom)
+# Video Codec   : libx264, preset=ultrafast, tune=zerolatency
+# Video Bitrate : 4000k target / 4500k max
+# Buffer        : 8000k
+# Profile       : baseline 4.1
+# Frame Rate    : Source (kept original)
+# Keyframe      : every 50 frames
+# Audio Codec   : AAC, 192kbps, 44100Hz, stereo
+# Stream Target : rtmp://a.rtmp.youtube.com/live2/<KEY>
+
+# ── Logo Shine Animation ─────────────────────
+# Uses FFmpeg geq filter with sine wave brightness oscillation
+# Pulse speed  : 1.2 Hz (1.2 pulses per second)
+# Brightness   : oscillates between 0.72 → 1.0
+# Glow pre-proc: ImageMagick soft halo via Disk morphology + blur
+
+# ── Performance Notes ────────────────────────
+# -preset ultrafast  = lowest CPU usage, fastest encode
+# -tune zerolatency  = minimal latency for live streaming
+# -threads 0         = uses all available CPU cores
+# -probesize 5M      = fast source file probe
+# geq shine filter   = CPU-intensive; disable if runner is slow
