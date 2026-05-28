@@ -17,7 +17,11 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y ffmpeg jq fonts-dejavu-core
+          sudo apt-get install -y ffmpeg jq fonts-dejavu-core python3 python3-pip
+
+      - name: Install yt-dlp
+        run: |
+          pip install yt-dlp --break-system-packages
 
       - name: Verify Stream Key
         run: |
@@ -27,9 +31,54 @@ jobs:
           fi
           echo "Stream key found."
 
+      - name: Resolve YouTube URLs (Fresh Direct Links)
+        run: |
+          python3 - <<'EOF'
+          import json, subprocess, sys
+
+          with open("playlist.json") as f:
+              data = json.load(f)
+
+          resolved = []
+          for v in data["videos"]:
+              url = v["url"]
+              if "youtube.com" in url or "youtu.be" in url:
+                  print(f"Resolving: {url}")
+                  result = subprocess.run(
+                      [
+                          "yt-dlp",
+                          "-f", "best[ext=mp4][height<=1080]/best[ext=mp4]/best",
+                          "--get-url",
+                          "--no-playlist",
+                          url
+                      ],
+                      capture_output=True, text=True
+                  )
+                  direct = result.stdout.strip().split("\n")[0]
+                  if direct and direct.startswith("http"):
+                      resolved.append({"url": direct})
+                      print(f"OK: resolved successfully")
+                  else:
+                      print(f"WARN: Could not resolve {url}, skipping")
+                      print(result.stderr)
+              else:
+                  resolved.append(v)
+
+          if not resolved:
+              print("ERROR: No videos resolved!")
+              sys.exit(1)
+
+          data["videos"] = resolved
+          with open("playlist.json", "w") as f:
+              json.dump(data, f, indent=2)
+
+          print(f"Done! {len(resolved)} video(s) ready.")
+          EOF
+
       - name: Start Live Stream
         env:
           STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
         run: |
           chmod +x stream.sh
           bash stream.sh
+ENDOFFILE
