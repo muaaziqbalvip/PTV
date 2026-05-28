@@ -1,4 +1,4 @@
-cat > /mnt/user-data/outputs/stream.sh << 'ENDOFFILE'
+<< 'ENDOFFILE'
 #!/bin/bash
 
 set -euo pipefail
