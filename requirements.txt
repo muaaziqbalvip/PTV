@@ -1,56 +1,49 @@
 # =============================================
-# 24/7 YouTube Live Stream - Requirements
+# MiTV Network — 24/7 YouTube Live Stream
+# Requirements & Setup Guide
 # =============================================
-# System and Python dependencies for streaming
-# with YouTube Live & MP4 support
 
-# --- System Dependencies (Ubuntu/Debian) ---
-# ffmpeg          >= 4.4      (video encoding & streaming)
-# jq              >= 1.6      (JSON parsing for playlist.json)
-# wget            >= 1.21     (image/file download)
-# fonts-dejavu-core           (fonts for ffmpeg drawtext ticker)
-# python3-pip                 (Python package manager)
+# ── System Dependencies (apt-get) ────────────
+# ffmpeg              >= 4.4    Video encoding & RTMP streaming
+# jq                  >= 1.6    JSON parsing (playlist.json)
+# wget                >= 1.21   Logo download from URL
+# imagemagick                   Logo glow pre-processing
+# yt-dlp                        YouTube video downloading
+# fonts-dejavu-core             Ticker drawtext font
+# libx264-dev                   H.264 encoder support
 
-# --- Python Packages (pip install) ---
-# yt-dlp          >= 2024.01  (YouTube stream capture & download)
+# ── GitHub Secrets Required ──────────────────
+# YOUTUBE_STREAM_KEY            From YouTube Studio → Go Live → Stream Key
 
-# --- GitHub Actions ---
-# actions/checkout@v4         (repo checkout)
-# ubuntu-latest runner        (build environment)
+# ── Repository Files Required ────────────────
+# stream.sh                     Main streaming script
+# playlist.json                 Config: videos, logo, ticker, effects
+# logo.png                      OR set logo.path to a URL in playlist.json
 
-# --- Required GitHub Secrets ---
-# YOUTUBE_STREAM_KEY          (YouTube Live Stream Key from YouTube Studio)
+# ── playlist.json logo.path tip ──────────────
+# Option A (file):  "path": "logo.png"        → place logo.png in repo root
+# Option B (URL):   "path": "https://..."     → auto-downloaded at stream start
 
-# --- Required Repository Files ---
-# stream.sh                   (main streaming script)
-# playlist.json               (video URLs, logo, ticker, effects config)
-# logo.png                    (logo image — OR set logo.path to a URL in playlist.json)
+# ── Encoding Specs ───────────────────────────
+# Resolution    : Source (pass-through, scaled by zoom)
+# Video Codec   : libx264, preset=ultrafast, tune=zerolatency
+# Video Bitrate : 4000k target / 4500k max
+# Buffer        : 8000k
+# Profile       : baseline 4.1
+# Frame Rate    : Source (kept original)
+# Keyframe      : every 50 frames
+# Audio Codec   : AAC, 192kbps, 44100Hz, stereo
+# Stream Target : rtmp://a.rtmp.youtube.com/live2/<KEY>
 
-# --- YouTube Live Settings (Recommended) ---
-# Resolution        : 1280x720 (720p HD) or 1920x1080 (1080p)
-# Frame Rate        : 30fps (stable) or 60fps (smooth)
-# Video Bitrate     : 4500 kbps (recommended)
-# Audio Bitrate     : 192 kbps
-# Encoder           : libx264 (ultrafast preset for low latency)
-# Stream URL        : rtmp://a.rtmp.youtube.com/live2/<STREAM_KEY>
+# ── Logo Shine Animation ─────────────────────
+# Uses FFmpeg geq filter with sine wave brightness oscillation
+# Pulse speed  : 1.2 Hz (1.2 pulses per second)
+# Brightness   : oscillates between 0.72 → 1.0
+# Glow pre-proc: ImageMagick soft halo via Disk morphology + blur
 
-# --- Supported Video Formats ---
-# ✓ MP4 files (local or remote URLs)
-# ✓ M3U playlists
-# ✓ YouTube Live streams (live/)
-# ✓ YouTube video links (youtu.be, youtube.com)
-
-# --- Performance Notes ---
-# • YouTube live → MP4 conversion uses yt-dlp (fast capture)
-# • MP4 optimization preset: veryfast (balances speed & quality)
-# • FFmpeg encoding: ultrafast + zerolatency (low latency streaming)
-# • Cache: Converted videos cached in /tmp/mitv_stream/cache/
-# • Stream loop: Infinite repeat with 3s transitions
-
-# --- Install Instructions ---
-# 1. Clone repo & cd into it
-# 2. chmod +x stream.sh
-# 3. Add GitHub secret: YOUTUBE_STREAM_KEY
-# 4. Push stream.sh, playlist.json, live.yml, logo.png
-# 5. GitHub Actions will install all dependencies
-# 6. Trigger workflow manually or wait for schedule (every 30 min)
+# ── Performance Notes ────────────────────────
+# -preset ultrafast  = lowest CPU usage, fastest encode
+# -tune zerolatency  = minimal latency for live streaming
+# -threads 0         = uses all available CPU cores
+# -probesize 5M      = fast source file probe
+# geq shine filter   = CPU-intensive; disable if runner is slow
