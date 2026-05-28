@@ -1,818 +1,1360 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MiTV 24/7 Stream Control Panel</title>
-    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MiTV Live Control — Muslim Islam Network</title>
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #050a0f;
+    --panel: #0b1520;
+    --panel2: #0f1e2e;
+    --border: #1a3a5c;
+    --accent: #00d4ff;
+    --accent2: #00ff88;
+    --accent3: #ff6b35;
+    --warn: #ffcc00;
+    --red: #ff3b5c;
+    --text: #c8e0f0;
+    --muted: #4a7a9b;
+    --glow: 0 0 20px rgba(0,212,255,0.3);
+    --glow2: 0 0 20px rgba(0,255,136,0.3);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Exo 2', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background: radial-gradient(ellipse at 20% 0%, rgba(0,100,200,0.08) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 100%, rgba(0,200,120,0.06) 0%, transparent 60%);
+    pointer-events: none; z-index:0;
+  }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #e0e0e0;
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
+  /* ── Scanline overlay ── */
+  body::after {
+    content:'';
+    position:fixed; inset:0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+    pointer-events:none; z-index:0;
+  }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
+  /* ── Header ── */
+  header {
+    position:relative; z-index:10;
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 18px 32px;
+    background: linear-gradient(90deg, #060e18, #0a1828, #060e18);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 4px 30px rgba(0,0,0,0.5);
+  }
+  .logo-area { display:flex; align-items:center; gap:14px; }
+  .logo-icon {
+    width:44px; height:44px; border-radius:10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display:flex; align-items:center; justify-content:center;
+    font-size:22px; box-shadow: var(--glow);
+  }
+  .logo-text h1 { font-size:20px; font-weight:900; letter-spacing:2px; color:#fff; }
+  .logo-text span { font-size:11px; color:var(--muted); letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace; }
 
-        header {
-            background: linear-gradient(90deg, #00ff99 0%, #00d4ff 100%);
-            padding: 25px;
-            border-radius: 12px;
-            margin-bottom: 30px;
-            box-shadow: 0 8px 32px rgba(0, 255, 153, 0.3);
-            color: #1a1a2e;
-        }
+  .live-badge {
+    display:flex; align-items:center; gap:8px;
+    padding:6px 16px; border-radius:20px;
+    background: rgba(255,59,92,0.15); border:1px solid var(--red);
+    font-size:13px; font-weight:700; color:var(--red); letter-spacing:2px;
+  }
+  .live-dot {
+    width:8px; height:8px; border-radius:50%; background:var(--red);
+    animation: pulse 1.2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(1.3)} }
 
-        header h1 {
-            font-size: 28px;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+  .firebase-status {
+    display:flex; align-items:center; gap:6px;
+    font-size:11px; color:var(--muted); font-family:'Share Tech Mono',monospace;
+  }
+  .fb-dot { width:7px; height:7px; border-radius:50%; background:var(--muted); }
+  .fb-dot.connected { background:var(--accent2); box-shadow:0 0 8px var(--accent2); }
 
-        .status-badge {
-            display: inline-block;
-            padding: 6px 14px;
-            background: #ff6b6b;
-            color: white;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            animation: pulse 2s infinite;
-        }
+  /* ── Tab Navigation ── */
+  .tab-nav {
+    position:relative; z-index:10;
+    display:flex; gap:4px;
+    padding: 12px 32px 0;
+    background: #060e18;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab-btn {
+    padding: 10px 22px; border:none; border-radius:8px 8px 0 0;
+    background: transparent; color:var(--muted);
+    font-family:'Exo 2',sans-serif; font-size:13px; font-weight:600;
+    cursor:pointer; transition:.2s; letter-spacing:1px;
+    border: 1px solid transparent; border-bottom:none;
+    display:flex; align-items:center; gap:8px;
+  }
+  .tab-btn:hover { color:var(--accent); background:rgba(0,212,255,0.05); }
+  .tab-btn.active {
+    color:var(--accent); background:var(--panel);
+    border-color: var(--border); border-bottom:1px solid var(--panel);
+    margin-bottom:-1px;
+  }
+  .tab-btn .icon { font-size:16px; }
 
-        .status-badge.online {
-            background: #51cf66;
-            animation: glow 2s infinite;
-        }
+  /* ── Main Content ── */
+  main {
+    position:relative; z-index:5;
+    padding: 28px 32px;
+    max-width: 1400px; margin:0 auto;
+  }
+  .tab-content { display:none; }
+  .tab-content.active { display:block; animation: fadeIn .3s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
+  /* ── Panels ── */
+  .panel {
+    background: var(--panel); border:1px solid var(--border);
+    border-radius:12px; padding:24px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .panel-title {
+    font-size:13px; font-weight:700; letter-spacing:3px;
+    text-transform:uppercase; color:var(--accent);
+    margin-bottom:20px; display:flex; align-items:center; gap:10px;
+    font-family:'Share Tech Mono',monospace;
+  }
+  .panel-title::before {
+    content:''; display:block; width:3px; height:16px;
+    background: linear-gradient(var(--accent), var(--accent2));
+    border-radius:2px;
+  }
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
 
-        @keyframes glow {
-            0%, 100% { box-shadow: 0 0 10px #51cf66; }
-            50% { box-shadow: 0 0 20px #51cf66; }
-        }
+  /* ── Form Controls ── */
+  .field { margin-bottom:16px; }
+  .field label {
+    display:block; margin-bottom:6px;
+    font-size:11px; font-weight:700; color:var(--muted);
+    letter-spacing:2px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;
+  }
+  .field input, .field select, .field textarea {
+    width:100%; padding:10px 14px;
+    background: rgba(0,0,0,0.4); border:1px solid var(--border);
+    border-radius:8px; color:var(--text);
+    font-family:'Share Tech Mono',monospace; font-size:13px;
+    transition:.2s; outline:none;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    border-color:var(--accent); box-shadow: 0 0 0 2px rgba(0,212,255,0.1);
+  }
+  .field select option { background:var(--panel); }
+  .field textarea { resize:vertical; min-height:80px; }
 
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 25px;
-            margin-bottom: 25px;
-        }
+  /* ── Range slider ── */
+  .field input[type=range] {
+    padding:0; height:4px; cursor:pointer;
+    accent-color: var(--accent); background:var(--border);
+  }
+  .range-row { display:flex; align-items:center; gap:12px; }
+  .range-val {
+    font-family:'Share Tech Mono',monospace;
+    font-size:13px; color:var(--accent2); min-width:40px; text-align:right;
+  }
 
-        @media (max-width: 1024px) {
-            .grid {
-                grid-template-columns: 1fr;
-            }
-        }
+  /* ── Buttons ── */
+  .btn {
+    padding:10px 22px; border:none; border-radius:8px;
+    font-family:'Exo 2',sans-serif; font-size:13px; font-weight:700;
+    cursor:pointer; transition:.2s; letter-spacing:1px;
+    display:inline-flex; align-items:center; gap:8px;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #0099cc);
+    color:#000; box-shadow: var(--glow);
+  }
+  .btn-primary:hover { transform:translateY(-1px); box-shadow: 0 0 30px rgba(0,212,255,0.5); }
+  .btn-success {
+    background: linear-gradient(135deg, var(--accent2), #00aa66);
+    color:#000; box-shadow: var(--glow2);
+  }
+  .btn-danger { background: linear-gradient(135deg, var(--red), #cc2244); color:#fff; }
+  .btn-warn { background: linear-gradient(135deg, var(--warn), #cc9900); color:#000; }
+  .btn-ghost { background:transparent; border:1px solid var(--border); color:var(--muted); }
+  .btn-ghost:hover { border-color:var(--accent); color:var(--accent); }
+  .btn-sm { padding:6px 14px; font-size:12px; }
 
-        .panel {
-            background: rgba(30, 30, 46, 0.8);
-            border: 1px solid #00ff99;
-            border-radius: 12px;
-            padding: 22px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }
+  /* ── Video List ── */
+  .video-list { display:flex; flex-direction:column; gap:10px; }
+  .video-item {
+    display:flex; align-items:center; gap:12px;
+    padding:12px 16px; background:rgba(0,0,0,0.3);
+    border:1px solid var(--border); border-radius:8px;
+    transition:.2s;
+  }
+  .video-item:hover { border-color:var(--accent); background:rgba(0,212,255,0.04); }
+  .video-num {
+    width:28px; height:28px; border-radius:6px; flex-shrink:0;
+    background: linear-gradient(135deg,var(--accent),var(--accent2));
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:900; color:#000;
+  }
+  .video-url {
+    flex:1; font-family:'Share Tech Mono',monospace; font-size:12px;
+    color:var(--text); word-break:break-all;
+  }
+  .video-actions { display:flex; gap:6px; flex-shrink:0; }
 
-        .panel h2 {
-            font-size: 18px;
-            color: #00ff99;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border-bottom: 2px solid #00ff99;
-            padding-bottom: 10px;
-        }
+  /* ── Schedule ── */
+  .schedule-grid { display:flex; flex-direction:column; gap:8px; }
+  .schedule-item {
+    display:flex; align-items:center; gap:12px;
+    padding:12px 16px; background:rgba(0,0,0,0.3);
+    border:1px solid var(--border); border-radius:8px;
+  }
+  .sched-time {
+    font-family:'Share Tech Mono',monospace; font-size:14px;
+    font-weight:700; color:var(--accent2); width:90px;
+  }
+  .sched-label { flex:1; font-size:13px; color:var(--text); }
+  .sched-badge {
+    padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700;
+    letter-spacing:1px;
+  }
+  .sched-badge.live { background:rgba(255,59,92,0.2); color:var(--red); border:1px solid var(--red); }
+  .sched-badge.queued { background:rgba(0,212,255,0.1); color:var(--accent); border:1px solid var(--accent); }
+  .sched-badge.done { background:rgba(0,255,136,0.1); color:var(--accent2); border:1px solid var(--accent2); }
 
-        .form-group {
-            margin-bottom: 16px;
-        }
+  /* ── Enhancement Tools ── */
+  .tool-card {
+    background:rgba(0,0,0,0.3); border:1px solid var(--border);
+    border-radius:10px; padding:20px; transition:.2s;
+  }
+  .tool-card:hover { border-color:var(--border); }
+  .tool-icon { font-size:32px; margin-bottom:12px; }
+  .tool-title { font-size:14px; font-weight:700; color:#fff; margin-bottom:6px; }
+  .tool-desc { font-size:12px; color:var(--muted); margin-bottom:16px; line-height:1.6; }
 
-        label {
-            display: block;
-            font-size: 13px;
-            color: #a0a0a0;
-            margin-bottom: 6px;
-            text-transform: uppercase;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-        }
+  /* ── Status bar ── */
+  .status-bar {
+    display:flex; align-items:center; gap:16px;
+    padding:10px 32px;
+    background:rgba(0,0,0,0.4); border-bottom:1px solid var(--border);
+    font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--muted);
+    position:relative; z-index:10;
+  }
+  .status-item { display:flex; align-items:center; gap:6px; }
+  .status-dot { width:6px; height:6px; border-radius:50%; }
+  .status-dot.ok { background:var(--accent2); animation:pulse 2s infinite; }
+  .status-dot.warn { background:var(--warn); }
+  .status-dot.err { background:var(--red); }
 
-        input[type="text"],
-        input[type="number"],
-        input[type="color"],
-        input[type="range"],
-        select,
-        textarea {
-            width: 100%;
-            padding: 10px 14px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid #00ff99;
-            border-radius: 8px;
-            color: #e0e0e0;
-            font-size: 13px;
-            font-family: inherit;
-            transition: all 0.3s ease;
-        }
+  /* ── Toggle switch ── */
+  .toggle-row {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 0;
+  }
+  .toggle-label { font-size:13px; color:var(--text); }
+  .toggle {
+    width:44px; height:24px; border-radius:12px;
+    background:var(--border); cursor:pointer; position:relative; transition:.3s;
+    border:none; outline:none; flex-shrink:0;
+  }
+  .toggle.on { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+  .toggle::after {
+    content:''; position:absolute; top:3px; left:3px;
+    width:18px; height:18px; border-radius:50%; background:#fff;
+    transition:.3s;
+  }
+  .toggle.on::after { left:23px; }
 
-        input[type="text"]:focus,
-        input[type="number"]:focus,
-        input[type="color"]:focus,
-        select:focus,
-        textarea:focus {
-            outline: none;
-            background: rgba(0, 255, 153, 0.1);
-            border-color: #00d4ff;
-            box-shadow: 0 0 10px rgba(0, 255, 153, 0.3);
-        }
+  /* ── Color picker row ── */
+  .color-row { display:flex; align-items:center; gap:10px; }
+  .color-row input[type=color] {
+    width:40px; height:36px; padding:2px;
+    border:1px solid var(--border); border-radius:6px;
+    background:transparent; cursor:pointer;
+  }
+  .color-hex {
+    flex:1; font-family:'Share Tech Mono',monospace; font-size:13px;
+    padding:10px 14px; background:rgba(0,0,0,0.4);
+    border:1px solid var(--border); border-radius:8px; color:var(--text);
+  }
 
-        .input-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
+  /* ── Toast ── */
+  .toast-container {
+    position:fixed; bottom:24px; right:24px; z-index:9999;
+    display:flex; flex-direction:column; gap:8px; pointer-events:none;
+  }
+  .toast {
+    padding:12px 20px; border-radius:8px; font-size:13px; font-weight:600;
+    border-left:3px solid; animation: slideIn .3s ease, fadeOut .3s ease 2.7s forwards;
+    pointer-events:auto; box-shadow:0 4px 20px rgba(0,0,0,0.4);
+  }
+  .toast.success { background:#0b2016; border-color:var(--accent2); color:var(--accent2); }
+  .toast.error   { background:#200810; border-color:var(--red);      color:var(--red); }
+  .toast.info    { background:#081520; border-color:var(--accent);   color:var(--accent); }
+  @keyframes slideIn { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
+  @keyframes fadeOut { from{opacity:1} to{opacity:0;transform:translateX(20px)} }
 
-        .btn {
-            padding: 11px 18px;
-            background: linear-gradient(90deg, #00ff99 0%, #00d4ff 100%);
-            color: #1a1a2e;
-            border: none;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+  /* ── Responsive ── */
+  @media(max-width:768px) {
+    header { padding:14px 16px; flex-wrap:wrap; gap:10px; }
+    main { padding:20px 16px; }
+    .tab-nav { padding:10px 16px 0; overflow-x:auto; }
+    .grid-2, .grid-3 { grid-template-columns:1fr; }
+    .status-bar { flex-wrap:wrap; padding:8px 16px; }
+  }
 
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 16px rgba(0, 255, 153, 0.4);
-        }
+  /* ── Separator ── */
+  .sep { height:1px; background:var(--border); margin:20px 0; }
 
-        .btn:active {
-            transform: translateY(0);
-        }
+  /* ── Loader ── */
+  .loader {
+    display:inline-block; width:14px; height:14px;
+    border:2px solid var(--border); border-top-color:var(--accent);
+    border-radius:50%; animation: spin .6s linear infinite;
+  }
+  @keyframes spin { to{transform:rotate(360deg)} }
 
-        .btn.danger {
-            background: linear-gradient(90deg, #ff6b6b 0%, #ff4757 100%);
-            color: white;
-        }
-
-        .btn.secondary {
-            background: rgba(255, 255, 255, 0.1);
-            color: #00ff99;
-            border: 1px solid #00ff99;
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .video-list {
-            max-height: 300px;
-            overflow-y: auto;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
-            padding: 12px;
-        }
-
-        .video-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            background: rgba(0, 255, 153, 0.1);
-            border-left: 3px solid #00ff99;
-            border-radius: 6px;
-            margin-bottom: 8px;
-            font-size: 12px;
-            gap: 8px;
-        }
-
-        .video-item span {
-            flex: 1;
-            word-break: break-all;
-            color: #00ff99;
-        }
-
-        .video-item .delete-btn {
-            padding: 5px 10px;
-            font-size: 11px;
-        }
-
-        .color-input-wrapper {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-
-        .color-input-wrapper input[type="color"] {
-            width: 50px;
-            height: 40px;
-            padding: 2px;
-            cursor: pointer;
-        }
-
-        .color-input-wrapper input[type="text"] {
-            flex: 1;
-        }
-
-        .range-display {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .range-display input[type="range"] {
-            flex: 1;
-        }
-
-        .range-value {
-            min-width: 50px;
-            text-align: right;
-            color: #00ff99;
-            font-weight: 600;
-        }
-
-        .toggle {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px;
-            background: rgba(0, 255, 153, 0.1);
-            border-radius: 8px;
-            margin-bottom: 12px;
-        }
-
-        .toggle input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
-            accent-color: #00ff99;
-        }
-
-        .toggle label {
-            margin: 0;
-            flex: 1;
-            cursor: pointer;
-        }
-
-        .status-text {
-            font-size: 12px;
-            color: #a0a0a0;
-            margin-top: 8px;
-            padding: 8px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 6px;
-            border-left: 2px solid #00ff99;
-        }
-
-        .spinner {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border: 2px solid #00ff99;
-            border-top: 2px solid transparent;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .preview-box {
-            background: rgba(0, 0, 0, 0.5);
-            border: 1px solid #00ff99;
-            border-radius: 8px;
-            padding: 12px;
-            margin-top: 12px;
-            font-size: 12px;
-            color: #00ff99;
-            max-height: 150px;
-            overflow-y: auto;
-        }
-
-        .error {
-            color: #ff6b6b;
-            background: rgba(255, 107, 107, 0.1);
-            border: 1px solid #ff6b6b;
-            padding: 10px;
-            border-radius: 6px;
-            margin-bottom: 12px;
-            font-size: 12px;
-        }
-
-        .success {
-            color: #51cf66;
-            background: rgba(81, 207, 102, 0.1);
-            border: 1px solid #51cf66;
-            padding: 10px;
-            border-radius: 6px;
-            margin-bottom: 12px;
-            font-size: 12px;
-        }
-
-        @media (max-width: 768px) {
-            .input-row {
-                grid-template-columns: 1fr;
-            }
-            
-            header h1 {
-                font-size: 20px;
-            }
-        }
-    </style>
+  .saving { opacity:.6; pointer-events:none; }
+</style>
 </head>
 <body>
-    <div class="container">
-        <!-- HEADER -->
-        <header>
-            <h1>
-                🎬 MiTV 24/7 Stream Control
-                <span class="status-badge" id="statusBadge">OFFLINE</span>
-            </h1>
-            <p style="font-size: 13px; opacity: 0.8;">Real-time Firebase Configuration • Edit Live While Streaming</p>
-        </header>
 
-        <div class="grid">
-            <!-- VIDEO URLS PANEL -->
-            <div class="panel">
-                <h2>📹 Video URLs (MP4/M3U/YouTube)</h2>
-                
-                <div class="form-group">
-                    <label>Add Video Link</label>
-                    <div class="input-row">
-                        <input type="text" id="videoUrl" placeholder="https://example.com/video.mp4 or YouTube link">
-                        <button class="btn" onclick="addVideo()">➕ Add</button>
-                    </div>
-                    <div class="status-text" id="videoStatus"></div>
-                </div>
+<!-- ── Header ── -->
+<header>
+  <div class="logo-area">
+    <div class="logo-icon">📡</div>
+    <div class="logo-text">
+      <h1>MiTV CONTROL</h1>
+      <span>Muslim Islam Network · Live Stream Dashboard</span>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:20px">
+    <div class="firebase-status">
+      <div class="fb-dot" id="fbDot"></div>
+      <span id="fbStatus">Connecting...</span>
+    </div>
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      LIVE
+    </div>
+  </div>
+</header>
 
-                <div class="video-list" id="videoList">
-                    <p style="color: #a0a0a0; text-align: center; padding: 20px;">No videos added yet</p>
-                </div>
+<!-- ── Status Bar ── -->
+<div class="status-bar">
+  <div class="status-item"><div class="status-dot ok"></div><span id="sbTime">--:--:--</span></div>
+  <div class="status-item"><div class="status-dot ok"></div><span>YouTube RTMP</span></div>
+  <div class="status-item"><div class="status-dot warn" id="wfDot"></div><span id="wfStatus">GitHub Actions: Checking...</span></div>
+  <div style="margin-left:auto;color:var(--accent2)" id="sbVideos">Videos: --</div>
+</div>
 
-                <button class="btn secondary" onclick="downloadYouTubeAsMP4()" style="width: 100%; margin-top: 12px;">
-                    🎥 Auto-Convert YouTube → MP4
-                </button>
-            </div>
+<!-- ── Tab Navigation ── -->
+<nav class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('schedule')"><span class="icon">📅</span>Schedule</button>
+  <button class="tab-btn" onclick="switchTab('playlist')"><span class="icon">🎬</span>Playlist / Links</button>
+  <button class="tab-btn" onclick="switchTab('ticker')"><span class="icon">📢</span>Ticker & Logo</button>
+  <button class="tab-btn" onclick="switchTab('audio')"><span class="icon">🎙️</span>Audio Enhancement</button>
+  <button class="tab-btn" onclick="switchTab('video')"><span class="icon">🎥</span>Video Enhancement</button>
+  <button class="tab-btn" onclick="switchTab('settings')"><span class="icon">⚙️</span>Settings</button>
+</nav>
 
-            <!-- LOGO PANEL -->
-            <div class="panel">
-                <h2>✨ Logo & Effects</h2>
+<!-- ── MAIN ── -->
+<main>
 
-                <div class="toggle">
-                    <input type="checkbox" id="logoEnabled" onchange="updateConfig()">
-                    <label for="logoEnabled">Enable Logo Overlay</label>
-                </div>
+  <!-- ═══════════════ SCHEDULE TAB ═══════════════ -->
+  <div class="tab-content active" id="tab-schedule">
+    <div class="grid-2" style="gap:24px">
 
-                <div class="form-group">
-                    <label>Logo URL / Path</label>
-                    <input type="text" id="logoPath" placeholder="logo.png or https://..." onchange="updateConfig()">
-                </div>
-
-                <div class="form-group">
-                    <label>Logo Position</label>
-                    <select id="logoPosition" onchange="updateConfig()">
-                        <option value="top-right">↗ Top Right</option>
-                        <option value="top-left">↖ Top Left</option>
-                        <option value="bottom-right">↘ Bottom Right</option>
-                        <option value="bottom-left">↙ Bottom Left</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Logo Width (px)</label>
-                    <div class="range-display">
-                        <input type="range" id="logoWidth" min="50" max="400" value="180" onchange="updateConfig()">
-                        <span class="range-value" id="logoWidthValue">180</span>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Zoom Effect</label>
-                    <div class="range-display">
-                        <input type="range" id="zoom" min="1.0" max="1.1" step="0.01" value="1.03" onchange="updateConfig()">
-                        <span class="range-value" id="zoomValue">1.03</span>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Audio Pitch</label>
-                    <div class="range-display">
-                        <input type="range" id="pitch" min="0.8" max="1.2" step="0.05" value="1.02" onchange="updateConfig()">
-                        <span class="range-value" id="pitchValue">1.02</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TICKER PANEL -->
-            <div class="panel">
-                <h2>📺 Ticker Bar</h2>
-
-                <div class="toggle">
-                    <input type="checkbox" id="tickerEnabled" onchange="updateConfig()" checked>
-                    <label for="tickerEnabled">Enable Ticker</label>
-                </div>
-
-                <div class="form-group">
-                    <label>Ticker Text</label>
-                    <textarea id="tickerText" onchange="updateConfig()" style="height: 60px; resize: none;">🔥 LIVE Islamic Stream • Welcome Everyone • سبحان الله • LIKE & SUBSCRIBE ❤️</textarea>
-                </div>
-
-                <div class="input-row">
-                    <div class="form-group">
-                        <label>Font Size</label>
-                        <div class="range-display">
-                            <input type="range" id="tickerSize" min="16" max="48" value="30" onchange="updateConfig()">
-                            <span class="range-value" id="tickerSizeValue">30</span>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Speed</label>
-                        <div class="range-display">
-                            <input type="range" id="tickerSpeed" min="30" max="150" value="90" onchange="updateConfig()">
-                            <span class="range-value" id="tickerSpeedValue">90</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="input-row">
-                    <div class="form-group">
-                        <label>Background Color</label>
-                        <div class="color-input-wrapper">
-                            <input type="color" id="tickerBg" value="#00ff99" onchange="updateConfig()">
-                            <input type="text" id="tickerBgText" value="00ff99" onchange="updateConfig()" placeholder="hex code">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Text Color</label>
-                        <div class="color-input-wrapper">
-                            <input type="color" id="tickerFg" value="#000000" onchange="updateConfig()">
-                            <input type="text" id="tickerFgText" value="000000" onchange="updateConfig()" placeholder="hex code">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Ticker Height (px)</label>
-                    <input type="number" id="tickerHeight" value="55" min="30" max="100" onchange="updateConfig()">
-                </div>
-            </div>
-
-            <!-- STREAM STATUS PANEL -->
-            <div class="panel">
-                <h2>📊 Stream Status & Export</h2>
-
-                <div id="firebaseStatus" class="status-text">
-                    <span class="spinner"></span> Connecting to Firebase...
-                </div>
-
-                <div class="form-group" style="margin-top: 16px;">
-                    <label>Current Configuration (JSON)</label>
-                    <div class="preview-box" id="configPreview" style="height: 200px; font-family: monospace; font-size: 11px;"></div>
-                </div>
-
-                <div class="btn-group" style="margin-top: 16px;">
-                    <button class="btn" onclick="downloadJSON()">⬇️ Download JSON</button>
-                    <button class="btn secondary" onclick="copyToClipboard()">📋 Copy JSON</button>
-                    <button class="btn danger" onclick="resetConfig()">🔄 Reset</button>
-                </div>
-
-                <div id="messageBox"></div>
-            </div>
+      <!-- Add Schedule -->
+      <div class="panel">
+        <div class="panel-title">Add Schedule</div>
+        <div class="field">
+          <label>Program Title</label>
+          <input type="text" id="schedTitle" placeholder="e.g. Quran Tilawat — Fajr"/>
         </div>
+        <div class="grid-2">
+          <div class="field">
+            <label>Start Time</label>
+            <input type="time" id="schedStart"/>
+          </div>
+          <div class="field">
+            <label>End Time</label>
+            <input type="time" id="schedEnd"/>
+          </div>
+        </div>
+        <div class="field">
+          <label>Repeat Days</label>
+          <select id="schedDays">
+            <option value="daily">Every Day</option>
+            <option value="weekdays">Weekdays Only</option>
+            <option value="weekends">Weekends Only</option>
+            <option value="friday">Friday Only</option>
+            <option value="once">One Time</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Video URL (optional override)</label>
+          <input type="url" id="schedUrl" placeholder="https://..."/>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:4px">
+          <button class="btn btn-success" onclick="addSchedule()">➕ Add Schedule</button>
+          <button class="btn btn-ghost" onclick="clearScheduleForm()">Clear</button>
+        </div>
+      </div>
+
+      <!-- Schedule List -->
+      <div class="panel">
+        <div class="panel-title">Today's Schedule</div>
+        <div class="schedule-grid" id="scheduleList">
+          <div style="color:var(--muted);font-size:13px;text-align:center;padding:20px">
+            <div class="loader"></div>
+            <div style="margin-top:8px">Loading from Firebase...</div>
+          </div>
+        </div>
+        <div class="sep"></div>
+        <button class="btn btn-ghost btn-sm" onclick="loadSchedule()">🔄 Refresh</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════ PLAYLIST TAB ═══════════════ -->
+  <div class="tab-content" id="tab-playlist">
+    <div class="grid-2" style="gap:24px">
+
+      <!-- Add Video -->
+      <div class="panel">
+        <div class="panel-title">Add / Edit Video Links</div>
+        <div class="field">
+          <label>Video URL (.mp4 / .m3u8 / direct link)</label>
+          <input type="url" id="newVideoUrl" placeholder="https://example.com/video.mp4"/>
+        </div>
+        <div class="field">
+          <label>Label (optional)</label>
+          <input type="text" id="newVideoLabel" placeholder="e.g. Bayan — Sheikh Ahmed"/>
+        </div>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-primary" onclick="addVideo()">➕ Add to Playlist</button>
+          <button class="btn btn-ghost" id="updateBtn" onclick="updateVideo()" style="display:none">✏️ Update</button>
+        </div>
+
+        <div class="sep"></div>
+        <div class="panel-title">Import playlist.json</div>
+        <input type="file" id="jsonFile" accept=".json" style="display:none" onchange="importJSON(this)"/>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-ghost" onclick="document.getElementById('jsonFile').click()">📂 Import JSON</button>
+          <button class="btn btn-ghost" onclick="exportJSON()">💾 Export JSON</button>
+        </div>
+      </div>
+
+      <!-- Video List -->
+      <div class="panel">
+        <div class="panel-title">Playlist <span id="videoCount" style="color:var(--accent2)"></span></div>
+        <div class="video-list" id="videoList">
+          <div style="color:var(--muted);font-size:13px;text-align:center;padding:20px">
+            <div class="loader"></div><div style="margin-top:8px">Loading...</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════ TICKER & LOGO TAB ═══════════════ -->
+  <div class="tab-content" id="tab-ticker">
+    <div class="grid-2" style="gap:24px">
+
+      <!-- Ticker Settings -->
+      <div class="panel">
+        <div class="panel-title">Ticker Settings</div>
+        <div class="toggle-row">
+          <span class="toggle-label">Enable Ticker</span>
+          <button class="toggle on" id="tickerToggle" onclick="toggleSwitch('tickerToggle')"></button>
+        </div>
+        <div class="sep"></div>
+        <div class="field">
+          <label>Ticker Text</label>
+          <textarea id="tickerText" placeholder="🔥 LIVE Islamic Stream • Welcome Everyone • سبحان الله • LIKE & SUBSCRIBE ❤️">🔥 LIVE Islamic Stream • Welcome Everyone • سبحان الله • LIKE & SUBSCRIBE ❤️</textarea>
+        </div>
+        <div class="field">
+          <label>Background Color</label>
+          <div class="color-row">
+            <input type="color" id="tickerBgColor" value="#00ff99" oninput="syncColor('tickerBgColor','tickerBgHex')"/>
+            <input type="text" class="color-hex" id="tickerBgHex" value="#00ff99" oninput="syncHex('tickerBgHex','tickerBgColor')"/>
+          </div>
+        </div>
+        <div class="field">
+          <label>Text Color</label>
+          <div class="color-row">
+            <input type="color" id="tickerTextColor" value="#000000" oninput="syncColor('tickerTextColor','tickerTextHex')"/>
+            <input type="text" class="color-hex" id="tickerTextHex" value="#000000" oninput="syncHex('tickerTextHex','tickerTextColor')"/>
+          </div>
+        </div>
+        <div class="field">
+          <label>Font Size</label>
+          <div class="range-row">
+            <input type="range" min="14" max="60" value="30" id="tickerFontSize" oninput="document.getElementById('tickerFontSizeVal').textContent=this.value"/>
+            <span class="range-val" id="tickerFontSizeVal">30</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Scroll Speed</label>
+          <div class="range-row">
+            <input type="range" min="20" max="300" value="90" id="tickerSpeed" oninput="document.getElementById('tickerSpeedVal').textContent=this.value"/>
+            <span class="range-val" id="tickerSpeedVal">90</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Height (px)</label>
+          <div class="range-row">
+            <input type="range" min="30" max="120" value="55" id="tickerHeight" oninput="document.getElementById('tickerHeightVal').textContent=this.value"/>
+            <span class="range-val" id="tickerHeightVal">55</span>
+          </div>
+        </div>
+        <button class="btn btn-success" onclick="saveTicker()" style="margin-top:8px">💾 Save Ticker to Firebase</button>
+      </div>
+
+      <!-- Logo Settings -->
+      <div class="panel">
+        <div class="panel-title">Logo Overlay</div>
+        <div class="toggle-row">
+          <span class="toggle-label">Enable Logo</span>
+          <button class="toggle on" id="logoToggle" onclick="toggleSwitch('logoToggle')"></button>
+        </div>
+        <div class="sep"></div>
+        <div class="field">
+          <label>Logo File Path</label>
+          <input type="text" id="logoPath" value="logo.png" placeholder="logo.png"/>
+        </div>
+        <div class="field">
+          <label>Position</label>
+          <select id="logoPosition">
+            <option value="top-right">Top Right</option>
+            <option value="top-left">Top Left</option>
+            <option value="bottom-right">Bottom Right</option>
+            <option value="bottom-left">Bottom Left</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Width (px)</label>
+          <div class="range-row">
+            <input type="range" min="60" max="400" value="180" id="logoWidth" oninput="document.getElementById('logoWidthVal').textContent=this.value"/>
+            <span class="range-val" id="logoWidthVal">180</span>
+          </div>
+        </div>
+
+        <!-- Live Preview -->
+        <div class="sep"></div>
+        <div class="panel-title" style="margin-bottom:12px">Live Preview</div>
+        <div id="tickerPreview" style="
+          position:relative; width:100%; padding-top:56.25%;
+          background:#111; border-radius:8px; overflow:hidden;
+          border:1px solid var(--border);
+        ">
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px">
+            📺 Video Preview Area
+          </div>
+          <div id="previewTicker" style="
+            position:absolute; bottom:0; left:0; right:0;
+            height:40px; background:#00ff99; display:flex; align-items:center;
+            overflow:hidden;
+          ">
+            <div id="previewTickerText" style="
+              white-space:nowrap; color:#000; font-size:14px; font-weight:600;
+              animation: scroll 12s linear infinite; padding:0 16px;
+            ">🔥 LIVE Islamic Stream • Welcome Everyone • سبحان الله</div>
+          </div>
+        </div>
+        <style>@keyframes scroll { 0%{transform:translateX(100%)} 100%{transform:translateX(-100%)} }</style>
+
+        <button class="btn btn-success" onclick="saveLogo()" style="margin-top:16px">💾 Save Logo to Firebase</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════ AUDIO ENHANCEMENT TAB ═══════════════ -->
+  <div class="tab-content" id="tab-audio">
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-title">🎙️ Audio Enhancement Settings</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:20px">These settings are applied via FFmpeg audio filters. Changes save to Firebase and apply on next stream restart.</p>
     </div>
 
-    <script>
-        // ══════════════════════════════════════════
-        // FIREBASE INITIALIZATION
-        // ══════════════════════════════════════════
-        const firebaseConfig = {
-            apiKey: "AIzaSyBbnU8DkthpYQMHOLLyj6M0cc05qXfjMcw",
-            authDomain: "ramadan-2385b.firebaseapp.com",
-            databaseURL: "https://ramadan-2385b-default-rtdb.firebaseio.com",
-            projectId: "ramadan-2385b",
-            storageBucket: "ramadan-2385b.firebasestorage.app",
-            messagingSenderId: "882828936310",
-            appId: "1:882828936310:web:7f97b921031fe130fe4b57"
-        };
+    <div class="grid-2" style="gap:20px">
 
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-        const playlistRef = db.ref('playlist');
+      <div class="panel">
+        <div class="panel-title">Pitch & Tempo</div>
+        <div class="field">
+          <label>Audio Pitch Multiplier</label>
+          <div class="range-row">
+            <input type="range" min="0.80" max="1.20" step="0.01" value="1.02" id="audioPitch" oninput="document.getElementById('audioPitchVal').textContent=parseFloat(this.value).toFixed(2)"/>
+            <span class="range-val" id="audioPitchVal">1.02</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">1.00 = normal · &lt;1.00 = lower · &gt;1.00 = higher</div>
+        </div>
+        <div class="field">
+          <label>Audio Tempo</label>
+          <div class="range-row">
+            <input type="range" min="0.80" max="1.20" step="0.01" value="1.00" id="audioTempo" oninput="document.getElementById('audioTempoVal').textContent=parseFloat(this.value).toFixed(2)"/>
+            <span class="range-val" id="audioTempoVal">1.00</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Sample Rate</label>
+          <select id="audioSampleRate">
+            <option value="44100">44100 Hz (Standard)</option>
+            <option value="48000">48000 Hz (Studio)</option>
+            <option value="22050">22050 Hz (Low)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Audio Bitrate</label>
+          <select id="audioBitrate">
+            <option value="128k">128k</option>
+            <option value="192k" selected>192k (Recommended)</option>
+            <option value="256k">256k (High Quality)</option>
+            <option value="320k">320k (Best)</option>
+          </select>
+        </div>
+      </div>
 
-        // ══════════════════════════════════════════
-        // SYNC WITH FIREBASE
-        // ══════════════════════════════════════════
-        playlistRef.on('value', (snapshot) => {
-            if (snapshot.exists()) {
-                const data = snapshot.val();
-                loadUIFromData(data);
-                document.getElementById('firebaseStatus').innerHTML = 
-                    '✅ Connected to Firebase • Last sync: ' + new Date().toLocaleTimeString();
-                document.getElementById('statusBadge').classList.add('online');
-                document.getElementById('statusBadge').textContent = 'LIVE';
-            } else {
-                document.getElementById('firebaseStatus').innerHTML = '⚠️ No data in Firebase yet';
-            }
-        }, (error) => {
-            document.getElementById('firebaseStatus').innerHTML = '❌ Firebase Error: ' + error.message;
-            document.getElementById('firebaseStatus').classList.add('error');
-        });
+      <div class="panel">
+        <div class="panel-title">Audio Filters</div>
 
-        // ══════════════════════════════════════════
-        // LOAD UI FROM DATA
-        // ══════════════════════════════════════════
-        function loadUIFromData(data) {
-            // Videos
-            if (data.videos) {
-                document.getElementById('videoList').innerHTML = '';
-                data.videos.forEach((video, idx) => {
-                    addVideoToUI(video.url, idx);
-                });
-            }
+        <div class="toggle-row">
+          <span class="toggle-label">Noise Reduction</span>
+          <button class="toggle" id="noiseToggle" onclick="toggleSwitch('noiseToggle')"></button>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Auto Gain Control</span>
+          <button class="toggle" id="gainToggle" onclick="toggleSwitch('gainToggle')"></button>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Bass Boost</span>
+          <button class="toggle" id="bassToggle" onclick="toggleSwitch('bassToggle')"></button>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Treble Boost</span>
+          <button class="toggle" id="trebleToggle" onclick="toggleSwitch('trebleToggle')"></button>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Volume Normalize</span>
+          <button class="toggle on" id="normalizeToggle" onclick="toggleSwitch('normalizeToggle')"></button>
+        </div>
 
-            // Logo
-            if (data.logo) {
-                document.getElementById('logoEnabled').checked = data.logo.enabled;
-                document.getElementById('logoPath').value = data.logo.path || '';
-                document.getElementById('logoPosition').value = data.logo.position || 'top-right';
-                document.getElementById('logoWidth').value = data.logo.width || 180;
-                document.getElementById('logoWidthValue').textContent = data.logo.width || 180;
-            }
+        <div class="sep"></div>
+        <div class="field">
+          <label>Master Volume (dB)</label>
+          <div class="range-row">
+            <input type="range" min="-20" max="20" step="1" value="0" id="masterVolume" oninput="document.getElementById('masterVolumeVal').textContent=this.value+'dB'"/>
+            <span class="range-val" id="masterVolumeVal">0dB</span>
+          </div>
+        </div>
 
-            // Effects
-            if (data.effects) {
-                document.getElementById('zoom').value = data.effects.zoom || 1.03;
-                document.getElementById('zoomValue').textContent = (data.effects.zoom || 1.03).toFixed(2);
-                document.getElementById('pitch').value = data.effects.audio_pitch || 1.02;
-                document.getElementById('pitchValue').textContent = (data.effects.audio_pitch || 1.02).toFixed(2);
-            }
+        <div class="sep"></div>
+        <div class="field">
+          <label>Generated FFmpeg Audio Filter</label>
+          <textarea id="audioFilterOutput" readonly style="font-size:11px;height:60px;color:var(--accent2)" placeholder="Will generate after save..."></textarea>
+        </div>
 
-            // Ticker
-            if (data.ticker) {
-                document.getElementById('tickerEnabled').checked = data.ticker.enabled;
-                document.getElementById('tickerText').value = data.ticker.text || '';
-                document.getElementById('tickerSize').value = data.ticker.font_size || 30;
-                document.getElementById('tickerSizeValue').textContent = data.ticker.font_size || 30;
-                document.getElementById('tickerSpeed').value = data.ticker.speed || 90;
-                document.getElementById('tickerSpeedValue').textContent = data.ticker.speed || 90;
-                document.getElementById('tickerHeight').value = data.ticker.height || 55;
+        <button class="btn btn-success" onclick="saveAudio()" style="margin-top:8px">💾 Save Audio Settings</button>
+      </div>
 
-                let bgColor = data.ticker.background_color || '#00ff99';
-                bgColor = bgColor.replace('#', '');
-                document.getElementById('tickerBg').value = '#' + bgColor;
-                document.getElementById('tickerBgText').value = bgColor;
+    </div>
+  </div>
 
-                let fgColor = data.ticker.text_color || '#000000';
-                fgColor = fgColor.replace('#', '');
-                document.getElementById('tickerFg').value = '#' + fgColor;
-                document.getElementById('tickerFgText').value = fgColor;
-            }
+  <!-- ═══════════════ VIDEO ENHANCEMENT TAB ═══════════════ -->
+  <div class="tab-content" id="tab-video">
+    <div class="grid-2" style="gap:20px">
 
-            updatePreview();
-        }
+      <div class="panel">
+        <div class="panel-title">Resolution & Quality</div>
+        <div class="field">
+          <label>Output Resolution</label>
+          <select id="videoRes">
+            <option value="1920x1080">1920×1080 (Full HD)</option>
+            <option value="1280x720">1280×720 (HD)</option>
+            <option value="854x480">854×480 (SD)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Video Bitrate</label>
+          <select id="videoBitrate">
+            <option value="2500k">2500k (SD+)</option>
+            <option value="4500k" selected>4500k (HD — Recommended)</option>
+            <option value="6000k">6000k (FHD)</option>
+            <option value="8000k">8000k (Ultra)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Encoding Preset</label>
+          <select id="videoPreset">
+            <option value="ultrafast">ultrafast (low CPU)</option>
+            <option value="superfast">superfast</option>
+            <option value="veryfast" selected>veryfast (recommended)</option>
+            <option value="faster">faster</option>
+            <option value="fast">fast (best quality)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Frame Rate (FPS)</label>
+          <select id="videoFps">
+            <option value="25">25 FPS</option>
+            <option value="30" selected>30 FPS</option>
+            <option value="60">60 FPS</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Buffer Size</label>
+          <select id="videoBuf">
+            <option value="5000k">5000k</option>
+            <option value="9000k" selected>9000k (Recommended)</option>
+            <option value="12000k">12000k</option>
+          </select>
+        </div>
+      </div>
 
-        // ══════════════════════════════════════════
-        // UPDATE CONFIG TO FIREBASE
-        // ══════════════════════════════════════════
-        function updateConfig() {
-            const videos = [];
-            document.querySelectorAll('.video-item span').forEach(el => {
-                const url = el.textContent.trim();
-                if (url) videos.push({ url });
-            });
+      <div class="panel">
+        <div class="panel-title">Visual Effects</div>
 
-            const config = {
-                videos: videos,
-                logo: {
-                    enabled: document.getElementById('logoEnabled').checked,
-                    path: document.getElementById('logoPath').value,
-                    position: document.getElementById('logoPosition').value,
-                    width: parseInt(document.getElementById('logoWidth').value)
-                },
-                ticker: {
-                    enabled: document.getElementById('tickerEnabled').checked,
-                    text: document.getElementById('tickerText').value,
-                    height: parseInt(document.getElementById('tickerHeight').value),
-                    background_color: '#' + document.getElementById('tickerBgText').value,
-                    text_color: '#' + document.getElementById('tickerFgText').value,
-                    font_size: parseInt(document.getElementById('tickerSize').value),
-                    speed: parseInt(document.getElementById('tickerSpeed').value)
-                },
-                effects: {
-                    zoom: parseFloat(document.getElementById('zoom').value),
-                    audio_pitch: parseFloat(document.getElementById('pitch').value)
-                }
-            };
+        <div class="toggle-row">
+          <span class="toggle-label">Zoom Effect</span>
+          <button class="toggle on" id="zoomToggle" onclick="toggleSwitch('zoomToggle')"></button>
+        </div>
+        <div class="field" style="margin-top:8px">
+          <label>Zoom Level</label>
+          <div class="range-row">
+            <input type="range" min="1.00" max="1.20" step="0.01" value="1.03" id="zoomLevel" oninput="document.getElementById('zoomLevelVal').textContent=parseFloat(this.value).toFixed(2)+'x'"/>
+            <span class="range-val" id="zoomLevelVal">1.03x</span>
+          </div>
+        </div>
 
-            playlistRef.set(config).then(() => {
-                showMessage('✅ Config saved to Firebase!', 'success');
-            }).catch(err => {
-                showMessage('❌ Error: ' + err.message, 'error');
-            });
+        <div class="sep"></div>
 
-            updatePreview();
-        }
+        <div class="toggle-row">
+          <span class="toggle-label">Sharpen Filter</span>
+          <button class="toggle" id="sharpenToggle" onclick="toggleSwitch('sharpenToggle')"></button>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Denoise Filter</span>
+          <button class="toggle" id="denoiseToggle" onclick="toggleSwitch('denoiseToggle')"></button>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Color Enhance</span>
+          <button class="toggle" id="colorToggle" onclick="toggleSwitch('colorToggle')"></button>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Vignette Effect</span>
+          <button class="toggle" id="vignetteToggle" onclick="toggleSwitch('vignetteToggle')"></button>
+        </div>
 
-        // ══════════════════════════════════════════
-        // ADD VIDEO
-        // ══════════════════════════════════════════
-        function addVideo() {
-            const url = document.getElementById('videoUrl').value.trim();
-            if (!url) {
-                showMessage('❌ Please enter a video URL', 'error');
-                return;
-            }
+        <div class="sep"></div>
 
-            // Convert YouTube to MP4 download link if needed
-            let finalUrl = url;
-            if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                finalUrl = convertYouTubeToDownloadLink(url);
-            }
+        <div class="field">
+          <label>Brightness</label>
+          <div class="range-row">
+            <input type="range" min="-1" max="1" step="0.05" value="0" id="brightness" oninput="document.getElementById('brightnessVal').textContent=this.value"/>
+            <span class="range-val" id="brightnessVal">0</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Contrast</label>
+          <div class="range-row">
+            <input type="range" min="-2" max="2" step="0.1" value="1" id="contrast" oninput="document.getElementById('contrastVal').textContent=this.value"/>
+            <span class="range-val" id="contrastVal">1</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Saturation</label>
+          <div class="range-row">
+            <input type="range" min="0" max="3" step="0.1" value="1" id="saturation" oninput="document.getElementById('saturationVal').textContent=this.value"/>
+            <span class="range-val" id="saturationVal">1</span>
+          </div>
+        </div>
 
-            addVideoToUI(finalUrl);
-            document.getElementById('videoUrl').value = '';
-            updateConfig();
-            showMessage('✅ Video added!', 'success');
-        }
+        <div class="sep"></div>
+        <div class="field">
+          <label>Generated FFmpeg Video Filter</label>
+          <textarea id="videoFilterOutput" readonly style="font-size:11px;height:60px;color:var(--accent2)"></textarea>
+        </div>
 
-        function addVideoToUI(url, index = null) {
-            const videoList = document.getElementById('videoList');
-            if (videoList.querySelector('p')) videoList.innerHTML = '';
+        <button class="btn btn-success" onclick="saveVideo()">💾 Save Video Settings</button>
+      </div>
 
-            const item = document.createElement('div');
-            item.className = 'video-item';
-            item.innerHTML = `
-                <span>${url}</span>
-                <button class="btn delete-btn danger" onclick="this.parentElement.remove(); updateConfig();">✕</button>
-            `;
-            videoList.appendChild(item);
-        }
+    </div>
+  </div>
 
-        // ══════════════════════════════════════════
-        // YOUTUBE CONVERTER
-        // ══════════════════════════════════════════
-        function convertYouTubeToDownloadLink(youtubeUrl) {
-            // Extract video ID
-            let videoId = '';
-            if (youtubeUrl.includes('youtube.com/live/')) {
-                videoId = youtubeUrl.split('youtube.com/live/')[1].split('?')[0];
-            } else if (youtubeUrl.includes('youtu.be/')) {
-                videoId = youtubeUrl.split('youtu.be/')[1].split('?')[0];
-            }
+  <!-- ═══════════════ SETTINGS TAB ═══════════════ -->
+  <div class="tab-content" id="tab-settings">
+    <div class="grid-2" style="gap:24px">
+      <div class="panel">
+        <div class="panel-title">YouTube Stream Settings</div>
+        <div class="field">
+          <label>RTMP Server</label>
+          <select id="rtmpServer">
+            <option value="rtmp://a.rtmp.youtube.com/live2/">Primary (a.rtmp.youtube.com)</option>
+            <option value="rtmp://b.rtmp.youtube.com/live2/">Backup (b.rtmp.youtube.com)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Stream Key (stored in GitHub Secrets — not shown)</label>
+          <input type="password" placeholder="Set via GitHub → Settings → Secrets → YOUTUBE_STREAM_KEY" readonly/>
+        </div>
+        <div class="field">
+          <label>Stream Loop Mode</label>
+          <select id="loopMode">
+            <option value="-1">Infinite Loop</option>
+            <option value="0">Play Once</option>
+            <option value="3">Loop 3x</option>
+          </select>
+        </div>
+        <div class="sep"></div>
+        <div class="panel-title">GitHub Actions</div>
+        <div class="field">
+          <label>Workflow Cron Schedule</label>
+          <select id="cronSchedule">
+            <option value="*/25 * * * *">Every 25 min (Recommended)</option>
+            <option value="*/30 * * * *">Every 30 min</option>
+            <option value="0 * * * *">Every Hour</option>
+            <option value="0 */6 * * *">Every 6 Hours</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Job Timeout (minutes)</label>
+          <input type="number" id="jobTimeout" value="340" min="60" max="350"/>
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:8px">💾 Save All Settings</button>
+      </div>
 
-            if (!videoId) return youtubeUrl;
+      <div class="panel">
+        <div class="panel-title">Firebase Connection</div>
+        <div style="display:grid;gap:8px;font-family:'Share Tech Mono',monospace;font-size:12px">
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+            <span style="color:var(--muted)">Project</span>
+            <span style="color:var(--accent)">ramadan-2385b</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+            <span style="color:var(--muted)">Database</span>
+            <span style="color:var(--accent);font-size:10px">ramadan-2385b-default-rtdb</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+            <span style="color:var(--muted)">Status</span>
+            <span id="fbStatusDetail" style="color:var(--warn)">Connecting...</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0">
+            <span style="color:var(--muted)">Last Sync</span>
+            <span id="lastSync" style="color:var(--text)">Never</span>
+          </div>
+        </div>
+        <div class="sep"></div>
+        <div class="panel-title">Actions</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <button class="btn btn-ghost" onclick="loadAll()">🔄 Reload All from Firebase</button>
+          <button class="btn btn-warn" onclick="resetToDefaults()">⚠️ Reset to Defaults</button>
+          <button class="btn btn-danger btn-sm" onclick="clearFirebaseData()">🗑️ Clear All Firebase Data</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-            // Return yt-dlp compatible format (requires backend)
-            // For now, return placeholder that stream.sh can handle
-            return `https://youtube.com/live/${videoId}`;
-        }
+</main>
 
-        function downloadYouTubeAsMP4() {
-            showMessage('⚠️ Requires backend server with yt-dlp installed. Check documentation.', 'error');
-            // In production, this would call a backend API to download YouTube video
-        }
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
 
-        // ══════════════════════════════════════════
-        // PREVIEW & EXPORT
-        // ══════════════════════════════════════════
-        function updatePreview() {
-            const videos = [];
-            document.querySelectorAll('.video-item span').forEach(el => {
-                videos.push({ url: el.textContent.trim() });
-            });
+<!-- ── Firebase SDK ── -->
+<script type="module">
+import { initializeApp }         from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, remove, onValue, push }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-            const config = {
-                videos,
-                logo: {
-                    enabled: document.getElementById('logoEnabled').checked,
-                    path: document.getElementById('logoPath').value,
-                    position: document.getElementById('logoPosition').value,
-                    width: parseInt(document.getElementById('logoWidth').value)
-                },
-                ticker: {
-                    enabled: document.getElementById('tickerEnabled').checked,
-                    text: document.getElementById('tickerText').value,
-                    height: parseInt(document.getElementById('tickerHeight').value),
-                    background_color: '#' + document.getElementById('tickerBgText').value,
-                    text_color: '#' + document.getElementById('tickerFgText').value,
-                    font_size: parseInt(document.getElementById('tickerSize').value),
-                    speed: parseInt(document.getElementById('tickerSpeed').value)
-                },
-                effects: {
-                    zoom: parseFloat(document.getElementById('zoom').value),
-                    audio_pitch: parseFloat(document.getElementById('pitch').value)
-                }
-            };
+const firebaseConfig = {
+  apiKey:            "AIzaSyBbnU8DkthpYQMHOLLyj6M0cc05qXfjMcw",
+  authDomain:        "ramadan-2385b.firebaseapp.com",
+  databaseURL:       "https://ramadan-2385b-default-rtdb.firebaseio.com",
+  projectId:         "ramadan-2385b",
+  storageBucket:     "ramadan-2385b.firebasestorage.app",
+  messagingSenderId: "882828936310",
+  appId:             "1:882828936310:web:7f97b921031fe130fe4b57"
+};
 
-            document.getElementById('configPreview').textContent = JSON.stringify(config, null, 2);
-        }
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
 
-        function downloadJSON() {
-            const config = document.getElementById('configPreview').textContent;
-            const blob = new Blob([config], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'playlist.json';
-            a.click();
-        }
+// ── Expose to global scope ──
+window._db  = db;
+window._ref = ref;
+window._set = set;
+window._get = get;
+window._remove = remove;
+window._push = push;
+window._onValue = onValue;
 
-        function copyToClipboard() {
-            const config = document.getElementById('configPreview').textContent;
-            navigator.clipboard.writeText(config).then(() => {
-                showMessage('✅ Copied to clipboard!', 'success');
-            });
-        }
+// ── Connection monitor ──
+const connRef = ref(db, '.info/connected');
+onValue(connRef, (snap) => {
+  const connected = snap.val();
+  const dot    = document.getElementById('fbDot');
+  const status = document.getElementById('fbStatus');
+  const detail = document.getElementById('fbStatusDetail');
+  const wfDot  = document.getElementById('wfDot');
+  if (connected) {
+    dot.classList.add('connected');
+    status.textContent = 'Firebase Connected';
+    if (detail) { detail.textContent = 'Connected ✓'; detail.style.color = 'var(--accent2)'; }
+    wfDot.className = 'status-dot ok';
+    document.getElementById('wfStatus').textContent = 'GitHub Actions: Ready';
+    document.getElementById('lastSync').textContent = new Date().toLocaleTimeString();
+  } else {
+    dot.classList.remove('connected');
+    status.textContent = 'Disconnected';
+    if (detail) { detail.textContent = 'Disconnected ✗'; detail.style.color = 'var(--red)'; }
+    wfDot.className = 'status-dot err';
+    document.getElementById('wfStatus').textContent = 'GitHub Actions: Offline';
+  }
+});
 
-        function resetConfig() {
-            if (confirm('Reset all settings?')) {
-                document.getElementById('logoEnabled').checked = true;
-                document.getElementById('tickerEnabled').checked = true;
-                updateConfig();
-                showMessage('🔄 Config reset!', 'success');
-            }
-        }
+// ── Live stream of videos ──
+const videosRef = ref(db, 'livestream/playlist/videos');
+onValue(videosRef, (snap) => {
+  const data = snap.val() || {};
+  window._videos = data;
+  renderVideoList(data);
+});
 
-        // ══════════════════════════════════════════
-        // RANGE VALUE UPDATES
-        // ══════════════════════════════════════════
-        document.getElementById('logoWidth').addEventListener('input', (e) => {
-            document.getElementById('logoWidthValue').textContent = e.target.value;
-        });
+// ── Live stream of schedule ──
+const schedRef = ref(db, 'livestream/schedule');
+onValue(schedRef, (snap) => {
+  const data = snap.val() || {};
+  renderScheduleList(data);
+});
 
-        document.getElementById('zoom').addEventListener('input', (e) => {
-            document.getElementById('zoomValue').textContent = parseFloat(e.target.value).toFixed(2);
-        });
+function renderVideoList(data) {
+  const keys   = Object.keys(data);
+  const list   = document.getElementById('videoList');
+  const count  = document.getElementById('videoCount');
+  document.getElementById('sbVideos').textContent = `Videos: ${keys.length}`;
+  if (count) count.textContent = `(${keys.length})`;
 
-        document.getElementById('pitch').addEventListener('input', (e) => {
-            document.getElementById('pitchValue').textContent = parseFloat(e.target.value).toFixed(2);
-        });
+  if (keys.length === 0) {
+    list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px;font-size:13px">No videos. Add one above.</div>';
+    return;
+  }
+  list.innerHTML = keys.map((k, i) => {
+    const v = data[k];
+    return `<div class="video-item" id="vi-${k}">
+      <div class="video-num">${i+1}</div>
+      <div class="video-url">${v.label ? `<div style="color:var(--accent2);font-size:11px;margin-bottom:3px">${v.label}</div>` : ''}${v.url}</div>
+      <div class="video-actions">
+        <button class="btn btn-ghost btn-sm" onclick="editVideo('${k}','${encodeURIComponent(v.url)}','${encodeURIComponent(v.label||'')}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteVideo('${k}')">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
 
-        document.getElementById('tickerSize').addEventListener('input', (e) => {
-            document.getElementById('tickerSizeValue').textContent = e.target.value;
-        });
+function renderScheduleList(data) {
+  const list = document.getElementById('scheduleList');
+  const keys = Object.keys(data);
+  if (keys.length === 0) {
+    list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px;font-size:13px">No schedules. Add one.</div>';
+    return;
+  }
+  const now = new Date();
+  const nowMin = now.getHours()*60 + now.getMinutes();
+  list.innerHTML = keys.map(k => {
+    const s = data[k];
+    const [sh, sm] = (s.start||'00:00').split(':').map(Number);
+    const [eh, em] = (s.end||'23:59').split(':').map(Number);
+    const sMin = sh*60+sm, eMin = eh*60+em;
+    const status = nowMin >= sMin && nowMin < eMin ? 'live' : nowMin < sMin ? 'queued' : 'done';
+    const labels = {live:'🔴 LIVE', queued:'⏳ QUEUED', done:'✅ DONE'};
+    return `<div class="schedule-item">
+      <div class="sched-time">${s.start} – ${s.end}</div>
+      <div>
+        <div class="sched-label">${s.title}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">${s.days||'daily'}</div>
+      </div>
+      <div class="sched-badge ${status}">${labels[status]}</div>
+      <button class="btn btn-danger btn-sm" onclick="deleteSchedule('${k}')">🗑️</button>
+    </div>`;
+  }).join('');
+}
 
-        document.getElementById('tickerSpeed').addEventListener('input', (e) => {
-            document.getElementById('tickerSpeedValue').textContent = e.target.value;
-        });
+// ── Expose DB ops ──
+window.addVideo = async function() {
+  const url   = document.getElementById('newVideoUrl').value.trim();
+  const label = document.getElementById('newVideoLabel').value.trim();
+  if (!url) { toast('Enter a video URL', 'error'); return; }
+  const newRef = window._push(ref(db, 'livestream/playlist/videos'));
+  await window._set(newRef, { url, label, addedAt: Date.now() });
+  document.getElementById('newVideoUrl').value = '';
+  document.getElementById('newVideoLabel').value = '';
+  toast('Video added!', 'success');
+};
 
-        document.getElementById('tickerBg').addEventListener('input', (e) => {
-            document.getElementById('tickerBgText').value = e.target.value.replace('#', '');
-        });
+window.editVideo = function(key, urlEnc, labelEnc) {
+  document.getElementById('newVideoUrl').value   = decodeURIComponent(urlEnc);
+  document.getElementById('newVideoLabel').value = decodeURIComponent(labelEnc);
+  const btn = document.getElementById('updateBtn');
+  btn.style.display = 'inline-flex';
+  btn.dataset.key = key;
+  switchTab('playlist');
+};
 
-        document.getElementById('tickerBgText').addEventListener('input', (e) => {
-            document.getElementById('tickerBg').value = '#' + e.target.value;
-        });
+window.updateVideo = async function() {
+  const btn  = document.getElementById('updateBtn');
+  const key  = btn.dataset.key;
+  const url  = document.getElementById('newVideoUrl').value.trim();
+  const label= document.getElementById('newVideoLabel').value.trim();
+  if (!url || !key) return;
+  await window._set(ref(db, `livestream/playlist/videos/${key}`), { url, label, updatedAt: Date.now() });
+  document.getElementById('newVideoUrl').value = '';
+  document.getElementById('newVideoLabel').value = '';
+  btn.style.display = 'none';
+  toast('Video updated!', 'success');
+};
 
-        document.getElementById('tickerFg').addEventListener('input', (e) => {
-            document.getElementById('tickerFgText').value = e.target.value.replace('#', '');
-        });
+window.deleteVideo = async function(key) {
+  if (!confirm('Delete this video?')) return;
+  await window._remove(ref(db, `livestream/playlist/videos/${key}`));
+  toast('Video deleted', 'info');
+};
 
-        document.getElementById('tickerFgText').addEventListener('input', (e) => {
-            document.getElementById('tickerFg').value = '#' + e.target.value;
-        });
+window.addSchedule = async function() {
+  const title = document.getElementById('schedTitle').value.trim();
+  const start = document.getElementById('schedStart').value;
+  const end   = document.getElementById('schedEnd').value;
+  const days  = document.getElementById('schedDays').value;
+  const url   = document.getElementById('schedUrl').value.trim();
+  if (!title || !start || !end) { toast('Fill in title, start and end time', 'error'); return; }
+  const newRef = window._push(ref(db, 'livestream/schedule'));
+  await window._set(newRef, { title, start, end, days, url, createdAt: Date.now() });
+  clearScheduleForm();
+  toast('Schedule added!', 'success');
+};
 
-        // ══════════════════════════════════════════
-        // MESSAGES
-        // ══════════════════════════════════════════
-        function showMessage(msg, type) {
-            const box = document.getElementById('messageBox');
-            box.innerHTML = `<div class="${type}">${msg}</div>`;
-            setTimeout(() => box.innerHTML = '', 4000);
-        }
+window.deleteSchedule = async function(key) {
+  if (!confirm('Delete this schedule?')) return;
+  await window._remove(ref(db, `livestream/schedule/${key}`));
+  toast('Schedule deleted', 'info');
+};
 
-        // Load initial data
-        updatePreview();
-    </script>
+window.saveTicker = async function() {
+  const data = {
+    enabled:          document.getElementById('tickerToggle').classList.contains('on'),
+    text:             document.getElementById('tickerText').value,
+    background_color: document.getElementById('tickerBgColor').value,
+    text_color:       document.getElementById('tickerTextColor').value,
+    font_size:        parseInt(document.getElementById('tickerFontSize').value),
+    speed:            parseInt(document.getElementById('tickerSpeed').value),
+    height:           parseInt(document.getElementById('tickerHeight').value),
+    updatedAt:        Date.now()
+  };
+  await window._set(ref(db, 'livestream/config/ticker'), data);
+  toast('Ticker settings saved!', 'success');
+  updatePreview();
+};
+
+window.saveLogo = async function() {
+  const data = {
+    enabled:  document.getElementById('logoToggle').classList.contains('on'),
+    path:     document.getElementById('logoPath').value.trim(),
+    position: document.getElementById('logoPosition').value,
+    width:    parseInt(document.getElementById('logoWidth').value),
+    updatedAt: Date.now()
+  };
+  await window._set(ref(db, 'livestream/config/logo'), data);
+  toast('Logo settings saved!', 'success');
+};
+
+window.saveAudio = async function() {
+  const pitch   = parseFloat(document.getElementById('audioPitch').value);
+  const tempo   = parseFloat(document.getElementById('audioTempo').value);
+  const sr      = document.getElementById('audioSampleRate').value;
+  const bitrate = document.getElementById('audioBitrate').value;
+  const vol     = parseInt(document.getElementById('masterVolume').value);
+
+  let filter = `asetrate=${sr}*${pitch},aresample=${sr}`;
+  if (document.getElementById('normalizeToggle').classList.contains('on')) filter += ',loudnorm';
+  if (document.getElementById('bassToggle').classList.contains('on'))      filter += ',equalizer=f=100:t=o:w=200:g=5';
+  if (document.getElementById('trebleToggle').classList.contains('on'))    filter += ',equalizer=f=8000:t=o:w=2000:g=4';
+  if (vol !== 0) filter += `,volume=${vol}dB`;
+
+  document.getElementById('audioFilterOutput').value = filter;
+
+  const data = {
+    pitch, tempo, sampleRate: sr, bitrate,
+    masterVolume: vol,
+    noiseReduction:   document.getElementById('noiseToggle').classList.contains('on'),
+    autoGain:         document.getElementById('gainToggle').classList.contains('on'),
+    bassBoost:        document.getElementById('bassToggle').classList.contains('on'),
+    trebleBoost:      document.getElementById('trebleToggle').classList.contains('on'),
+    normalize:        document.getElementById('normalizeToggle').classList.contains('on'),
+    generatedFilter:  filter,
+    updatedAt:        Date.now()
+  };
+  await window._set(ref(db, 'livestream/config/audio'), data);
+  toast('Audio settings saved!', 'success');
+};
+
+window.saveVideo = async function() {
+  const res     = document.getElementById('videoRes').value;
+  const bitrate = document.getElementById('videoBitrate').value;
+  const preset  = document.getElementById('videoPreset').value;
+  const fps     = document.getElementById('videoFps').value;
+  const buf     = document.getElementById('videoBuf').value;
+  const zoom    = parseFloat(document.getElementById('zoomLevel').value);
+  const bright  = parseFloat(document.getElementById('brightness').value);
+  const cont    = parseFloat(document.getElementById('contrast').value);
+  const sat     = parseFloat(document.getElementById('saturation').value);
+
+  let vfilter = '';
+  if (document.getElementById('zoomToggle').classList.contains('on'))
+    vfilter += `zoompan=z=${zoom}:d=1:s=${res},crop=${res.replace('x',':')},`;
+  if (document.getElementById('sharpenToggle').classList.contains('on'))
+    vfilter += 'unsharp=5:5:1.0:5:5:0.0,';
+  if (document.getElementById('denoiseToggle').classList.contains('on'))
+    vfilter += 'hqdn3d,';
+  if (document.getElementById('colorToggle').classList.contains('on'))
+    vfilter += `eq=brightness=${bright}:contrast=${cont}:saturation=${sat},`;
+  if (document.getElementById('vignetteToggle').classList.contains('on'))
+    vfilter += 'vignette,';
+  vfilter = vfilter.replace(/,$/, '');
+
+  document.getElementById('videoFilterOutput').value = vfilter || '(no filter)';
+
+  const data = {
+    resolution: res, bitrate, preset, fps: parseInt(fps), bufferSize: buf,
+    zoom: { enabled: document.getElementById('zoomToggle').classList.contains('on'), level: zoom },
+    sharpen:   document.getElementById('sharpenToggle').classList.contains('on'),
+    denoise:   document.getElementById('denoiseToggle').classList.contains('on'),
+    colorEnhance: document.getElementById('colorToggle').classList.contains('on'),
+    vignette:  document.getElementById('vignetteToggle').classList.contains('on'),
+    brightness: bright, contrast: cont, saturation: sat,
+    generatedFilter: vfilter,
+    updatedAt: Date.now()
+  };
+  await window._set(ref(db, 'livestream/config/video'), data);
+  toast('Video settings saved!', 'success');
+};
+
+window.saveSettings = async function() {
+  const data = {
+    rtmpServer:   document.getElementById('rtmpServer').value,
+    loopMode:     document.getElementById('loopMode').value,
+    cronSchedule: document.getElementById('cronSchedule').value,
+    jobTimeout:   parseInt(document.getElementById('jobTimeout').value),
+    updatedAt:    Date.now()
+  };
+  await window._set(ref(db, 'livestream/config/settings'), data);
+  toast('Settings saved!', 'success');
+};
+
+window.loadAll = async function() {
+  toast('Reloading from Firebase...', 'info');
+  const snap = await window._get(ref(db, 'livestream/config'));
+  if (snap.exists()) {
+    const cfg = snap.val();
+    if (cfg.ticker) {
+      const t = cfg.ticker;
+      document.getElementById('tickerText').value     = t.text || '';
+      document.getElementById('tickerBgColor').value  = t.background_color || '#00ff99';
+      document.getElementById('tickerBgHex').value    = t.background_color || '#00ff99';
+      document.getElementById('tickerTextColor').value= t.text_color || '#000000';
+      document.getElementById('tickerTextHex').value  = t.text_color || '#000000';
+      document.getElementById('tickerFontSize').value = t.font_size || 30;
+      document.getElementById('tickerFontSizeVal').textContent = t.font_size || 30;
+      document.getElementById('tickerSpeed').value    = t.speed || 90;
+      document.getElementById('tickerSpeedVal').textContent = t.speed || 90;
+      document.getElementById('tickerHeight').value   = t.height || 55;
+      document.getElementById('tickerHeightVal').textContent = t.height || 55;
+      if (t.enabled !== undefined) setToggle('tickerToggle', t.enabled);
+    }
+    if (cfg.audio) {
+      const a = cfg.audio;
+      document.getElementById('audioPitch').value    = a.pitch || 1.02;
+      document.getElementById('audioPitchVal').textContent = parseFloat(a.pitch||1.02).toFixed(2);
+      document.getElementById('audioBitrate').value  = a.bitrate || '192k';
+      document.getElementById('audioSampleRate').value = a.sampleRate || '44100';
+      if (a.normalize !== undefined) setToggle('normalizeToggle', a.normalize);
+    }
+    if (cfg.video) {
+      const v = cfg.video;
+      document.getElementById('videoRes').value     = v.resolution || '1920x1080';
+      document.getElementById('videoBitrate').value = v.bitrate || '4500k';
+      document.getElementById('videoPreset').value  = v.preset || 'veryfast';
+      if (v.zoom) {
+        setToggle('zoomToggle', v.zoom.enabled);
+        document.getElementById('zoomLevel').value = v.zoom.level || 1.03;
+        document.getElementById('zoomLevelVal').textContent = (v.zoom.level||1.03).toFixed(2)+'x';
+      }
+    }
+    if (cfg.settings) {
+      const s = cfg.settings;
+      document.getElementById('rtmpServer').value    = s.rtmpServer    || '';
+      document.getElementById('loopMode').value      = s.loopMode      || '-1';
+      document.getElementById('cronSchedule').value  = s.cronSchedule  || '*/25 * * * *';
+      document.getElementById('jobTimeout').value    = s.jobTimeout    || 340;
+    }
+    document.getElementById('lastSync').textContent = new Date().toLocaleTimeString();
+    toast('All settings loaded!', 'success');
+  }
+};
+
+window.resetToDefaults = async function() {
+  if (!confirm('Reset all settings to defaults?')) return;
+  await window._set(ref(db, 'livestream/config'), {
+    ticker: { enabled:true, text:'🔥 LIVE Islamic Stream • Welcome Everyone • سبحان الله • LIKE & SUBSCRIBE ❤️', background_color:'#00ff99', text_color:'#000000', font_size:30, speed:90, height:55 },
+    logo:   { enabled:true, path:'logo.png', position:'top-right', width:180 },
+    audio:  { pitch:1.02, tempo:1.00, sampleRate:'44100', bitrate:'192k', masterVolume:0, normalize:true },
+    video:  { resolution:'1920x1080', bitrate:'4500k', preset:'veryfast', fps:30, bufferSize:'9000k', zoom:{ enabled:true, level:1.03 } },
+    settings: { rtmpServer:'rtmp://a.rtmp.youtube.com/live2/', loopMode:'-1', cronSchedule:'*/25 * * * *', jobTimeout:340 }
+  });
+  toast('Reset to defaults!', 'success');
+  window.loadAll();
+};
+
+window.clearFirebaseData = async function() {
+  if (!confirm('⚠️ DELETE ALL Firebase livestream data? This cannot be undone!')) return;
+  await window._remove(ref(db, 'livestream'));
+  toast('All data cleared', 'info');
+};
+
+window.loadSchedule = function() {
+  toast('Schedule refreshes automatically via Firebase listener', 'info');
+};
+
+window.exportJSON = async function() {
+  const snap = await window._get(ref(db, 'livestream/playlist/videos'));
+  const data = snap.val() || {};
+  const videos = Object.values(data).map(v => ({ url: v.url }));
+
+  const tickerSnap = await window._get(ref(db, 'livestream/config/ticker'));
+  const logoSnap   = await window._get(ref(db, 'livestream/config/logo'));
+  const audioSnap  = await window._get(ref(db, 'livestream/config/audio'));
+  const videoSnap  = await window._get(ref(db, 'livestream/config/video'));
+
+  const t = tickerSnap.val() || {};
+  const l = logoSnap.val()   || {};
+  const a = audioSnap.val()  || {};
+  const v = videoSnap.val()  || {};
+
+  const json = {
+    videos,
+    logo:   { enabled: l.enabled??true, path: l.path||'logo.png', position: l.position||'top-right', width: l.width||180 },
+    ticker: { enabled: t.enabled??true, height: t.height||55, background_color: t.background_color||'#00ff99', text_color: t.text_color||'#000000', font_size: t.font_size||30, speed: t.speed||90, text: t.text||'' },
+    effects:{ zoom: v.zoom?.level||1.03, audio_pitch: a.pitch||1.02 }
+  };
+
+  const blob = new Blob([JSON.stringify(json, null, 2)], { type:'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a2   = document.createElement('a');
+  a2.href = url; a2.download = 'playlist.json';
+  a2.click(); URL.revokeObjectURL(url);
+  toast('playlist.json exported!', 'success');
+};
+
+window.importJSON = function(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const json = JSON.parse(e.target.result);
+      if (json.videos) {
+        const updates = {};
+        json.videos.forEach((v, i) => { updates[`v${i}`] = { url: v.url, label: v.label||'' }; });
+        await window._set(ref(db, 'livestream/playlist/videos'), updates);
+      }
+      if (json.ticker) await window._set(ref(db, 'livestream/config/ticker'), json.ticker);
+      if (json.logo)   await window._set(ref(db, 'livestream/config/logo'), json.logo);
+      toast('playlist.json imported!', 'success');
+    } catch { toast('Invalid JSON file', 'error'); }
+  };
+  reader.readAsText(file);
+};
+
+// ── Load config on startup ──
+setTimeout(window.loadAll, 1500);
+</script>
+
+<!-- ── UI Logic ── -->
+<script>
+// ── Tab Switching ──
+function switchTab(id) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  event && event.currentTarget.classList.add('active');
+  const btns = document.querySelectorAll('.tab-btn');
+  const tabs = ['schedule','playlist','ticker','audio','video','settings'];
+  btns.forEach((b, i) => { if (tabs[i] === id) b.classList.add('active'); });
+}
+
+// ── Toggle ──
+function toggleSwitch(id) {
+  document.getElementById(id).classList.toggle('on');
+}
+function setToggle(id, val) {
+  const el = document.getElementById(id);
+  if (val) el.classList.add('on'); else el.classList.remove('on');
+}
+
+// ── Color sync ──
+function syncColor(colorId, hexId) {
+  document.getElementById(hexId).value = document.getElementById(colorId).value;
+  if (colorId === 'tickerBgColor') updatePreview();
+}
+function syncHex(hexId, colorId) {
+  const v = document.getElementById(hexId).value;
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) document.getElementById(colorId).value = v;
+}
+
+// ── Preview ──
+function updatePreview() {
+  const bg   = document.getElementById('tickerBgColor').value;
+  const col  = document.getElementById('tickerTextColor').value;
+  const txt  = document.getElementById('tickerText').value;
+  const prev = document.getElementById('previewTicker');
+  const ptxt = document.getElementById('previewTickerText');
+  if (prev) prev.style.background = bg;
+  if (ptxt) { ptxt.style.color = col; ptxt.textContent = txt; }
+}
+
+// ── Schedule form clear ──
+function clearScheduleForm() {
+  ['schedTitle','schedStart','schedEnd','schedUrl'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('schedDays').value = 'daily';
+}
+
+// ── Toast ──
+function toast(msg, type = 'info') {
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3100);
+}
+window.toast = toast;
+
+// ── Clock ──
+setInterval(() => {
+  document.getElementById('sbTime').textContent = new Date().toLocaleTimeString();
+}, 1000);
+</script>
 </body>
 </html>
