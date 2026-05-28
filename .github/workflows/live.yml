@@ -81,4 +81,3 @@ jobs:
         run: |
           chmod +x stream.sh
           bash stream.sh
-ENDOFFILE
