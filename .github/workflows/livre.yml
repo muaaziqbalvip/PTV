@@ -1,71 +1,73 @@
 name: 24/7 YouTube Live Stream
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:        # manual start
   schedule:
-    - cron: '0 */5 * * *'
+    - cron: '0 */5 * * *'  # auto-restart har 5 ghante (GitHub 6h limit se pehle)
 
 jobs:
   stream:
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    timeout-minutes: 350    # ~5h 50min
+
+    env:
+      STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
+      RTMP_URL: 'rtmp://a.rtmp.youtube.com/live2'
 
     steps:
+      # â”€â”€â”€ 1. FFmpeg install â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - name: Install FFmpeg
-        run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg wget
-
-      - name: Download Logo
         run: |
-          wget -q "https://APNA-LOGO-LINK.png" -O logo.png || echo "Logo download fail, bina logo stream hoga"
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
 
-      - name: Build Playlist
+      # â”€â”€â”€ 2. Playlist â€” APNE MP4 LINKS YAHAN DAALO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      - name: Build playlist
         run: |
           cat > playlist.txt << 'PLAYLIST'
-file 'https://APNA-PEHLA-VIDEO.mp4'
-file 'https://APNA-DOOSRA-VIDEO.mp4'
-file 'https://APNA-TEESRA-VIDEO.mp4'
-PLAYLIST
+          file 'https://www.dropbox.com/scl/fi/kcbptz83amymszl3v6jyj/lv_0_20260530002656.mp4?rlkey=x5cpl50duxvka6izjkahjkkzw&st=cj5xf84m&raw=1'
+          file 'https://www.dropbox.com/scl/fi/zv7z1sbm81ohxp04a5anx/lv_0_20260529230011.mp4?rlkey=gpuytnfr9wtp2yc1mzn5l0hil&st=4woqwd9c&raw=1'
+          file 'https://www.dropbox.com/scl/fi/kcbptz83amymszl3v6jyj/lv_0_20260530002656.mp4?rlkey=x5cpl50duxvka6izjkahjkkzw&st=cj5xf84m&raw=1'
+          PLAYLIST
+
+          echo "=== Playlist ==="
           cat playlist.txt
 
-      - name: Start Stream
-        env:
-          STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
+      # â”€â”€â”€ 3. Infinite loop stream â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      - name: Start 24/7 HD Stream
         run: |
+          echo "Stream shuru ho raha hai..."
           while true; do
-            if [ -f logo.png ]; then
-              ffmpeg -re -stream_loop -1 -f concat -safe 0 \
-                -protocol_whitelist file,http,https,tcp,tls,crypto \
-                -i playlist.txt \
-                -i logo.png \
-                -filter_complex "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=60[base];[1:v]scale=150:-1:flags=lanczos[logo];[base][logo]overlay=W-w-20:20:format=auto[vout]" \
-                -map "[vout]" -map 0:a \
-                -c:v libx264 -preset faster -tune zerolatency \
-                -profile:v high -level 4.2 \
-                -b:v 6000k -maxrate 6000k -bufsize 12000k \
-                -g 120 -keyint_min 120 -sc_threshold 0 \
-                -pix_fmt yuv420p \
-                -c:a aac -b:a 192k -ar 48000 -ac 2 \
-                -f flv "rtmp://a.rtmp.youtube.com/live2/${STREAM_KEY}" \
-                2>&1 | tee -a stream.log
-            else
-              ffmpeg -re -stream_loop -1 -f concat -safe 0 \
-                -protocol_whitelist file,http,https,tcp,tls,crypto \
-                -i playlist.txt \
-                -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=60" \
-                -c:v libx264 -preset faster -tune zerolatency \
-                -profile:v high -level 4.2 \
-                -b:v 6000k -maxrate 6000k -bufsize 12000k \
-                -g 120 -keyint_min 120 -sc_threshold 0 \
-                -pix_fmt yuv420p \
-                -c:a aac -b:a 192k -ar 48000 -ac 2 \
-                -f flv "rtmp://a.rtmp.youtube.com/live2/${STREAM_KEY}" \
-                2>&1 | tee -a stream.log
-            fi
-            echo "Restart ho raha hai 5 sec mein..."
+            ffmpeg \
+              -re \
+              -stream_loop -1 \
+              -f concat \
+              -safe 0 \
+              -protocol_whitelist file,http,https,tcp,tls,crypto \
+              -i playlist.txt \
+              -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black" \
+              -c:v libx264 \
+              -preset veryfast \
+              -tune zerolatency \
+              -b:v 4500k \
+              -maxrate 4500k \
+              -bufsize 9000k \
+              -g 60 \
+              -keyint_min 60 \
+              -sc_threshold 0 \
+              -c:a aac \
+              -b:a 160k \
+              -ar 44100 \
+              -ac 2 \
+              -f flv \
+              "${RTMP_URL}/${STREAM_KEY}" \
+              2>&1 | tee -a stream.log
+            echo "FFmpeg band hua â€” 5 second baad restart..."
             sleep 5
           done
 
-      - name: Upload Log
+      # â”€â”€â”€ 4. Log (debug ke liye) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      - name: Upload stream log
         if: always()
         uses: actions/upload-artifact@v4
         with:
