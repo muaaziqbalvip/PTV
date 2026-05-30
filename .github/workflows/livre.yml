@@ -102,5 +102,4 @@ PLAYLIST
           name: stream-log-${{ github.run_number }}
           path: stream.log
           retention-days: 3
-EOF
 echo "Done"
