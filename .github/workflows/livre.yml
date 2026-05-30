@@ -95,8 +95,8 @@ jobs:
       - name: Build Playlist
         run: |
           cat > playlist.txt << 'PLAYLIST'
-          file 'https://www.dropbox.com/scl/fi/zv7z1sbm81ohxp04a5anx/lv_0_20260529230011.mp4?rlkey=gpuytnfr9wtp2yc1mzn5l0hil&st=4woqwd9c&raw=1'
-          file 'https://www.dropbox.com/scl/fi/zv7z1sbm81ohxp04a5anx/lv_0_20260529230011.mp4?rlkey=gpuytnfr9wtp2yc1mzn5l0hil&st=4woqwd9c&raw=1'
+          file 'https://muaaziqbalvip.github.io/Milive2/0.mp4'
+          file 'https://muaaziqbalvip.github.io/Milive2/0.mp4'
           PLAYLIST
 
           echo "=== Playlist ==="
