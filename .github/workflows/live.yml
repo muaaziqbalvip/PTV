@@ -1,9 +1,9 @@
-name: 24-7 YouTube Live Stream
+name: 24/7 YouTube Live Stream
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/25 * * * *"
+    - cron: '0 */5 * * *'
 
 jobs:
   stream:
@@ -11,115 +11,64 @@ jobs:
     timeout-minutes: 350
 
     steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v4
+      - name: Install FFmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg wget
 
-      - name: Install Dependencies
+      - name: Download Logo
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y ffmpeg jq fonts-dejavu-core python3 python3-pip unzip
+          wget -q "https://i.ibb.co/gZFSmCPw/file-00000000305071fa945b58b012ac072b-removebg-preview.png" -O logo.png || echo "Logo download fail, bina logo stream hoga"
 
-      - name: Install yt-dlp
+      - name: Build Playlist
         run: |
-          pip install yt-dlp --break-system-packages
+          cat > playlist.txt << 'PLAYLIST'
+file 'https://www.dropbox.com/scl/fi/zv7z1sbm81ohxp04a5anx/lv_0_20260529230011.mp4?rlkey=gpuytnfr9wtp2yc1mzn5l0hil&st=3v3g7vuz&raw=1'
+file 'https://www.dropbox.com/scl/fi/zv7z1sbm81ohxp04a5anx/lv_0_20260529230011.mp4?rlkey=gpuytnfr9wtp2yc1mzn5l0hil&st=3v3g7vuz&raw=1'
+file 'https://www.dropbox.com/scl/fi/zv7z1sbm81ohxp04a5anx/lv_0_20260529230011.mp4?rlkey=gpuytnfr9wtp2yc1mzn5l0hil&st=3v3g7vuz&raw=1'
+PLAYLIST
+          cat playlist.txt
 
-      - name: Install Deno (JS Runtime for yt-dlp)
-        run: |
-          curl -fsSL https://deno.land/install.sh | sh
-          echo "$HOME/.deno/bin" >> $GITHUB_PATH
-
-      - name: Verify Stream Key
-        run: |
-          if [ -z "${{ secrets.YOUTUBE_STREAM_KEY }}" ]; then
-            echo "ERROR: YOUTUBE_STREAM_KEY secret is not set!"
-            exit 1
-          fi
-          echo "Stream key found."
-
-      - name: Write YouTube Cookies
-        run: |
-          echo "${{ secrets.YOUTUBE_COOKIES }}" > cookies.txt
-
-      - name: Resolve YouTube URLs
-        run: |
-          python3 - <<'EOF'
-          import json, subprocess, sys, os
-
-          with open("playlist.json") as f:
-              data = json.load(f)
-
-          deno_path = os.path.expanduser("~/.deno/bin")
-          env = os.environ.copy()
-          env["PATH"] = deno_path + ":" + env.get("PATH", "")
-
-          resolved = []
-          for v in data["videos"]:
-              url = v["url"].strip()
-              if not url or "VIDEO_ID" in url:
-                  print(f"SKIP: placeholder URL — {url}")
-                  continue
-
-              if "youtube.com" in url or "youtu.be" in url:
-                  print(f"Resolving: {url}")
-
-                  # Live stream detection
-                  is_live = "/live/" in url
-
-                  if is_live:
-                      # Live streams: get m3u8 HLS URL
-                      result = subprocess.run(
-                          [
-                              "yt-dlp",
-                              "--cookies", "cookies.txt",
-                              "--js-runtimes", "deno",
-                              "-f", "best",
-                              "--get-url",
-                              "--no-playlist",
-                              url
-                          ],
-                          capture_output=True, text=True, env=env
-                      )
-                  else:
-                      # Regular videos: get direct mp4
-                      result = subprocess.run(
-                          [
-                              "yt-dlp",
-                              "--cookies", "cookies.txt",
-                              "--js-runtimes", "deno",
-                              "-f", "best[ext=mp4][height<=1080]/best[ext=mp4]/best",
-                              "--get-url",
-                              "--no-playlist",
-                              url
-                          ],
-                          capture_output=True, text=True, env=env
-                      )
-
-                  direct = result.stdout.strip().split("\n")[0]
-                  if direct and direct.startswith("http"):
-                      resolved.append({"url": direct})
-                      print(f"OK: {'live m3u8' if is_live else 'mp4'} resolved")
-                  else:
-                      print(f"WARN: Could not resolve {url}")
-                      print(result.stderr[-300:])
-              else:
-                  if url.startswith("http"):
-                      resolved.append(v)
-                      print(f"OK: direct URL kept — {url}")
-
-          if not resolved:
-              print("ERROR: No videos resolved! Check your playlist.json URLs.")
-              sys.exit(1)
-
-          data["videos"] = resolved
-          with open("playlist.json", "w") as f:
-              json.dump(data, f, indent=2)
-
-          print(f"\nDone! {len(resolved)} video(s) ready to stream.")
-          EOF
-
-      - name: Start Live Stream
+      - name: Start Stream
         env:
           STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
         run: |
-          chmod +x stream.sh
-          bash stream.sh
+          while true; do
+            if [ -f logo.png ]; then
+              ffmpeg -re -stream_loop -1 -f concat -safe 0 \
+                -protocol_whitelist file,http,https,tcp,tls,crypto \
+                -i playlist.txt \
+                -i logo.png \
+                -filter_complex "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=60[base];[1:v]scale=150:-1:flags=lanczos[logo];[base][logo]overlay=W-w-20:20:format=auto[vout]" \
+                -map "[vout]" -map 0:a \
+                -c:v libx264 -preset faster -tune zerolatency \
+                -profile:v high -level 4.2 \
+                -b:v 6000k -maxrate 6000k -bufsize 12000k \
+                -g 120 -keyint_min 120 -sc_threshold 0 \
+                -pix_fmt yuv420p \
+                -c:a aac -b:a 192k -ar 48000 -ac 2 \
+                -f flv "rtmp://a.rtmp.youtube.com/live2/${STREAM_KEY}" \
+                2>&1 | tee -a stream.log
+            else
+              ffmpeg -re -stream_loop -1 -f concat -safe 0 \
+                -protocol_whitelist file,http,https,tcp,tls,crypto \
+                -i playlist.txt \
+                -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=60" \
+                -c:v libx264 -preset faster -tune zerolatency \
+                -profile:v high -level 4.2 \
+                -b:v 6000k -maxrate 6000k -bufsize 12000k \
+                -g 120 -keyint_min 120 -sc_threshold 0 \
+                -pix_fmt yuv420p \
+                -c:a aac -b:a 192k -ar 48000 -ac 2 \
+                -f flv "rtmp://a.rtmp.youtube.com/live2/${STREAM_KEY}" \
+                2>&1 | tee -a stream.log
+            fi
+            echo "Restart ho raha hai 5 sec mein..."
+            sleep 5
+          done
+
+      - name: Upload Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stream-log-${{ github.run_number }}
+          path: stream.log
+          retention-days: 3
