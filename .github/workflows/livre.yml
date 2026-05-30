@@ -14,46 +14,46 @@ jobs:
       STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
       RTMP_URL: 'rtmp://a.rtmp.youtube.com/live2'
 
-      # ════════════════════════════════════════════
+      # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
       #   APNI SETTINGS YAHAN BADLO
-      # ════════════════════════════════════════════
+      # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
       LOGO_URL: 'https://i.ibb.co/gZFSmCPw/file-00000000305071fa945b58b012ac072b-removebg-preview.png'       # PNG logo (transparent background ho to best)
       LOGO_POSITION: 'W-w-20:20'                   # top-right corner (badlne ke options neeche)
       LOGO_SIZE: '150'                              # logo width pixels mein
 
-      # MP4 videos — playlist.txt mein neeche daalo
-      # ════════════════════════════════════════════
+      # MP4 videos â€” playlist.txt mein neeche daalo
+      # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     steps:
-      # ─── 1. FFmpeg + tools ───────────────────────────────────────────────
+      # â”€â”€â”€ 1. FFmpeg + tools â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - name: Install FFmpeg
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg wget
           ffmpeg -version | head -1
 
-      # ─── 2. Logo download ────────────────────────────────────────────────
+      # â”€â”€â”€ 2. Logo download â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - name: Download Logo
         run: |
           wget -q "$LOGO_URL" -O logo.png
           echo "Logo download hua:"
           file logo.png
 
-      # ─── 3. Playlist — APNE MP4 LINKS YAHAN DAALO ───────────────────────
+      # â”€â”€â”€ 3. Playlist â€” APNE MP4 LINKS YAHAN DAALO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - name: Build Playlist
         run: |
           cat > playlist.txt << 'PLAYLIST'
-file 'https://www.dropbox.com/scl/fi/zv7z1sbm81ohxp04a5anx/lv_0_20260529230011.mp4?rlkey=gpuytnfr9wtp2yc1mzn5l0hil&st=l26lvdr5&raw=1'
-file 'https://www.dropbox.com/scl/fi/zv7z1sbm81ohxp04a5anx/lv_0_20260529230011.mp4?rlkey=gpuytnfr9wtp2yc1mzn5l0hil&st=l26lvdr5&raw=1'
-file 'https://www.dropbox.com/scl/fi/zv7z1sbm81ohxp04a5anx/lv_0_20260529230011.mp4?rlkey=gpuytnfr9wtp2yc1mzn5l0hil&st=l26lvdr5&raw=1'
+file 'https://APNA-PEHLA-VIDEO.mp4'
+file 'https://APNA-DOOSRA-VIDEO.mp4'
+file 'https://APNA-TEESRA-VIDEO.mp4'
 PLAYLIST
           echo "=== Playlist ==="
           cat playlist.txt
 
-      # ─── 4. Stream with Logo overlay (1080p60 HD) ────────────────────────
+      # â”€â”€â”€ 4. Stream with Logo overlay (1080p60 HD) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - name: Start 24/7 HD Stream with Logo
         run: |
-          echo "Stream shuru ho raha hai — 1080p60 HD + Logo..."
+          echo "Stream shuru ho raha hai â€” 1080p60 HD + Logo..."
           while true; do
             ffmpeg \
               -re \
@@ -90,11 +90,11 @@ PLAYLIST
               -f flv \
               "${RTMP_URL}/${STREAM_KEY}" \
               2>&1 | tee -a stream.log
-            echo "FFmpeg band hua — 5 sec mein restart..."
+            echo "FFmpeg band hua â€” 5 sec mein restart..."
             sleep 5
           done
 
-      # ─── 5. Log upload ───────────────────────────────────────────────────
+      # â”€â”€â”€ 5. Log upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - name: Upload Stream Log
         if: always()
         uses: actions/upload-artifact@v4
