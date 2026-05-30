@@ -16,14 +16,14 @@ jobs:
 
       - name: Download Logo
         run: |
-          wget -q "https://i.ibb.co/gZFSmCPw/file-00000000305071fa945b58b012ac072b-removebg-preview.png" -O logo.png || echo "Logo download fail, bina logo stream hoga"
+          wget -q "https://APNA-LOGO-LINK.png" -O logo.png || echo "Logo download fail, bina logo stream hoga"
 
       - name: Build Playlist
         run: |
           cat > playlist.txt << 'PLAYLIST'
-file 'https://www.dropbox.com/scl/fi/zv7z1sbm81ohxp04a5anx/lv_0_20260529230011.mp4?rlkey=gpuytnfr9wtp2yc1mzn5l0hil&st=3v3g7vuz&raw=1'
-file 'https://www.dropbox.com/scl/fi/zv7z1sbm81ohxp04a5anx/lv_0_20260529230011.mp4?rlkey=gpuytnfr9wtp2yc1mzn5l0hil&st=3v3g7vuz&raw=1'
-file 'https://www.dropbox.com/scl/fi/zv7z1sbm81ohxp04a5anx/lv_0_20260529230011.mp4?rlkey=gpuytnfr9wtp2yc1mzn5l0hil&st=3v3g7vuz&raw=1'
+file 'https://APNA-PEHLA-VIDEO.mp4'
+file 'https://APNA-DOOSRA-VIDEO.mp4'
+file 'https://APNA-TEESRA-VIDEO.mp4'
 PLAYLIST
           cat playlist.txt
 
