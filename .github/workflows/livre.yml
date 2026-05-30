@@ -17,7 +17,7 @@ jobs:
       # ════════════════════════════════════════════
       #   APNI SETTINGS YAHAN BADLO
       # ════════════════════════════════════════════
-      LOGO_URL: 'https://APNA-LOGO-LINK.png'       # PNG logo (transparent background ho to best)
+      LOGO_URL: 'https://i.ibb.co/gZFSmCPw/file-00000000305071fa945b58b012ac072b-removebg-preview.png'       # PNG logo (transparent background ho to best)
       LOGO_POSITION: 'W-w-20:20'                   # top-right corner (badlne ke options neeche)
       LOGO_SIZE: '150'                              # logo width pixels mein
 
