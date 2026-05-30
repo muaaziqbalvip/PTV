@@ -1,42 +1,59 @@
-name: 24/7 YouTube Live Stream
+name: 24/7 YouTube Live Stream (HD + Logo)
 
 on:
-  workflow_dispatch:        # manual start
+  workflow_dispatch:
   schedule:
-    - cron: '0 */5 * * *'  # auto-restart har 5 ghante (GitHub 6h limit se pehle)
+    - cron: '0 */5 * * *'  # auto-restart har 5 ghante
 
 jobs:
   stream:
     runs-on: ubuntu-latest
-    timeout-minutes: 350    # ~5h 50min
+    timeout-minutes: 350
 
     env:
       STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
       RTMP_URL: 'rtmp://a.rtmp.youtube.com/live2'
 
+      # ════════════════════════════════════════════
+      #   APNI SETTINGS YAHAN BADLO
+      # ════════════════════════════════════════════
+      LOGO_URL: 'https://APNA-LOGO-LINK.png'       # PNG logo (transparent background ho to best)
+      LOGO_POSITION: 'W-w-20:20'                   # top-right corner (badlne ke options neeche)
+      LOGO_SIZE: '150'                              # logo width pixels mein
+
+      # MP4 videos — playlist.txt mein neeche daalo
+      # ════════════════════════════════════════════
+
     steps:
-      # â”€â”€â”€ 1. FFmpeg install â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      # ─── 1. FFmpeg + tools ───────────────────────────────────────────────
       - name: Install FFmpeg
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg wget
+          ffmpeg -version | head -1
 
-      # â”€â”€â”€ 2. Playlist â€” APNE MP4 LINKS YAHAN DAALO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      - name: Build playlist
+      # ─── 2. Logo download ────────────────────────────────────────────────
+      - name: Download Logo
+        run: |
+          wget -q "$LOGO_URL" -O logo.png
+          echo "Logo download hua:"
+          file logo.png
+
+      # ─── 3. Playlist — APNE MP4 LINKS YAHAN DAALO ───────────────────────
+      - name: Build Playlist
         run: |
           cat > playlist.txt << 'PLAYLIST'
-          file 'https://www.dropbox.com/scl/fi/zv7z1sbm81ohxp04a5anx/lv_0_20260529230011.mp4?rlkey=gpuytnfr9wtp2yc1mzn5l0hil&st=4woqwd9c&raw=1'
-          file 'https://www.dropbox.com/scl/fi/zv7z1sbm81ohxp04a5anx/lv_0_20260529230011.mp4?rlkey=gpuytnfr9wtp2yc1mzn5l0hil&st=4woqwd9c&raw=1'
-          file 'https://www.dropbox.com/scl/fi/zv7z1sbm81ohxp04a5anx/lv_0_20260529230011.mp4?rlkey=gpuytnfr9wtp2yc1mzn5l0hil&st=4woqwd9c&raw=1'
-          PLAYLIST
-
+file 'https://APNA-PEHLA-VIDEO.mp4'
+file 'https://APNA-DOOSRA-VIDEO.mp4'
+file 'https://APNA-TEESRA-VIDEO.mp4'
+PLAYLIST
           echo "=== Playlist ==="
           cat playlist.txt
 
-      # â”€â”€â”€ 3. Infinite loop stream â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      - name: Start 24/7 HD Stream
+      # ─── 4. Stream with Logo overlay (1080p60 HD) ────────────────────────
+      - name: Start 24/7 HD Stream with Logo
         run: |
-          echo "Stream shuru ho raha hai..."
+          echo "Stream shuru ho raha hai — 1080p60 HD + Logo..."
           while true; do
             ffmpeg \
               -re \
@@ -45,32 +62,45 @@ jobs:
               -safe 0 \
               -protocol_whitelist file,http,https,tcp,tls,crypto \
               -i playlist.txt \
-              -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black" \
+              -i logo.png \
+              -filter_complex \
+                "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,\
+                pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,\
+                setsar=1,fps=60[base];\
+                [1:v]scale=${LOGO_SIZE}:-1:flags=lanczos[logo];\
+                [base][logo]overlay=${LOGO_POSITION}:format=auto[vout]" \
+              -map "[vout]" \
+              -map 0:a \
               -c:v libx264 \
-              -preset veryfast \
+              -preset faster \
               -tune zerolatency \
-              -b:v 4500k \
-              -maxrate 4500k \
-              -bufsize 9000k \
-              -g 60 \
-              -keyint_min 60 \
+              -profile:v high \
+              -level 4.2 \
+              -b:v 6000k \
+              -maxrate 6000k \
+              -bufsize 12000k \
+              -g 120 \
+              -keyint_min 120 \
               -sc_threshold 0 \
+              -pix_fmt yuv420p \
               -c:a aac \
-              -b:a 160k \
-              -ar 44100 \
+              -b:a 192k \
+              -ar 48000 \
               -ac 2 \
               -f flv \
               "${RTMP_URL}/${STREAM_KEY}" \
               2>&1 | tee -a stream.log
-            echo "FFmpeg band hua â€” 5 second baad restart..."
+            echo "FFmpeg band hua — 5 sec mein restart..."
             sleep 5
           done
 
-      # â”€â”€â”€ 4. Log (debug ke liye) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      - name: Upload stream log
+      # ─── 5. Log upload ───────────────────────────────────────────────────
+      - name: Upload Stream Log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: stream-log-${{ github.run_number }}
           path: stream.log
           retention-days: 3
+EOF
+echo "Done"
