@@ -1,18 +1,22 @@
-name: 24/7 YouTube Live Stream (Pro)
+name: 24/7 YouTube Live Stream (Pro Animated)
 
 on:
   workflow_dispatch:
     inputs:
       logo_url:
-        description: 'Logo image URL (PNG with transparency preferred)'
+        description: 'Logo image URL (PNG transparent preferred)'
         required: false
-        default: 'https://i.ibb.co/gZFSmCPw/file-00000000305071fa945b58b012ac072b-removebg-preview.png'
+        default: ''
       logo_position:
         description: 'Logo position: topleft / topright / bottomleft / bottomright'
         required: false
         default: 'topright'
+      scroll_text:
+        description: 'Scrolling ticker text (repeat karta rahega)'
+        required: false
+        default: '🌙 Welcome to our Live Stream  ✨  Stay tuned for amazing content  🌙  Subscribe & Like  ✨  '
       quality_preset:
-        description: 'Quality: low (1080p/3Mbps) | mid (1080p/4.5Mbps) | high (1080p/6Mbps)'
+        description: 'Quality: low (3Mbps) | mid (4.5Mbps) | high (6Mbps)'
         required: false
         default: 'mid'
   schedule:
@@ -26,94 +30,95 @@ jobs:
     env:
       STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
       RTMP_URL: 'rtmp://a.rtmp.youtube.com/live2'
-      LOGO_URL: ${{ github.event.inputs.logo_url || 'https://i.imgur.com/xxxxxxx.png' }}
-      LOGO_POS: ${{ github.event.inputs.logo_position || 'topright' }}
-      QUALITY:  ${{ github.event.inputs.quality_preset || 'mid' }}
+      LOGO_URL:  ${{ github.event.inputs.logo_url || '' }}
+      LOGO_POS:  ${{ github.event.inputs.logo_position || 'topright' }}
+      QUALITY:   ${{ github.event.inputs.quality_preset || 'mid' }}
+      TICKER:    ${{ github.event.inputs.scroll_text || '🌙 Welcome to our Live Stream  ✨  Stay tuned for amazing content  🌙  Subscribe & Like  ✨  ' }}
 
     steps:
-      # ─── 1. FFmpeg install ──────────────────────────────────────────────────
-      - name: Install FFmpeg
+      # ─── 1. Dependencies ────────────────────────────────────────────────────
+      - name: Install FFmpeg + ImageMagick
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg curl
+          sudo apt-get install -y ffmpeg curl imagemagick
 
-      # ─── 2. Download logo ───────────────────────────────────────────────────
-      - name: Download Logo
+      # ─── 2. Logo download + resize ──────────────────────────────────────────
+      - name: Prepare Logo
         run: |
-          curl -sL "$LOGO_URL" -o logo_raw.png || true
+          LOGO_READY=false
 
-          # Agar logo download fail ho to fallback transparent 1x1 pixel
-          if [ ! -s logo_raw.png ]; then
-            echo "Logo download fail — fallback use ho raha hai"
-            ffmpeg -f lavfi -i color=black@0:size=1x1:rate=1 \
-              -frames:v 1 logo_raw.png -y -loglevel quiet
+          if [ -n "$LOGO_URL" ]; then
+            curl -sL --max-time 30 "$LOGO_URL" -o logo_raw.png && \
+            [ -s logo_raw.png ] && LOGO_READY=true || true
           fi
 
-          # Logo ko resize karo: max 180px wide, aspect ratio preserve
+          if [ "$LOGO_READY" = false ]; then
+            echo "Logo nahi mila — default placeholder bana raha hoon"
+            convert -size 220x220 xc:none \
+              -fill 'rgba(255,215,0,0.9)' \
+              -draw "circle 110,110 110,10" \
+              -fill white -font DejaVu-Sans-Bold -pointsize 36 \
+              -gravity Center -annotate 0 "LIVE" \
+              logo_raw.png
+          fi
+
+          # Resize: 220px wide, aspect preserve, transparent background
           ffmpeg -i logo_raw.png \
-            -vf "scale='min(180,iw)':-1:flags=lanczos" \
+            -vf "scale='min(220,iw)':-1:flags=lanczos" \
             logo.png -y -loglevel quiet
 
-          echo "=== Logo ready ==="
+          echo "✅ Logo ready:"
           file logo.png
 
-      # ─── 3. Quality settings set karo ──────────────────────────────────────
+      # ─── 3. Quality params ──────────────────────────────────────────────────
       - name: Set Quality Params
         run: |
           case "$QUALITY" in
             low)
-              echo "VBR=3000k"    >> $GITHUB_ENV
-              echo "MAXR=3000k"   >> $GITHUB_ENV
-              echo "BUFS=6000k"   >> $GITHUB_ENV
-              echo "PRESET=faster" >> $GITHUB_ENV
-              ;;
+              { echo "VBR=3000k"; echo "MAXR=3000k"; echo "BUFS=6000k"; echo "PRESET=faster"; } >> $GITHUB_ENV ;;
             high)
-              echo "VBR=6000k"    >> $GITHUB_ENV
-              echo "MAXR=6000k"   >> $GITHUB_ENV
-              echo "BUFS=12000k"  >> $GITHUB_ENV
-              echo "PRESET=fast"  >> $GITHUB_ENV
-              ;;
-            *)  # mid (default)
-              echo "VBR=4500k"    >> $GITHUB_ENV
-              echo "MAXR=4500k"   >> $GITHUB_ENV
-              echo "BUFS=9000k"   >> $GITHUB_ENV
-              echo "PRESET=veryfast" >> $GITHUB_ENV
-              ;;
+              { echo "VBR=6000k"; echo "MAXR=6000k"; echo "BUFS=12000k"; echo "PRESET=fast"; } >> $GITHUB_ENV ;;
+            *)
+              { echo "VBR=4500k"; echo "MAXR=4500k"; echo "BUFS=9000k"; echo "PRESET=veryfast"; } >> $GITHUB_ENV ;;
           esac
 
-      # ─── 4. Logo position calculate karo ───────────────────────────────────
-      - name: Set Logo Overlay Position
+      # ─── 4. Logo position ───────────────────────────────────────────────────
+      - name: Set Logo Position
         run: |
           case "$LOGO_POS" in
-            topleft)     echo "OVERLAY_POS=20:20"          >> $GITHUB_ENV ;;
-            bottomleft)  echo "OVERLAY_POS=20:H-h-20"      >> $GITHUB_ENV ;;
-            bottomright) echo "OVERLAY_POS=W-w-20:H-h-20"  >> $GITHUB_ENV ;;
-            *)           echo "OVERLAY_POS=W-w-20:20"      >> $GITHUB_ENV ;;  # topright default
+            topleft)     echo "OVERLAY_POS=25:25"          >> $GITHUB_ENV ;;
+            bottomleft)  echo "OVERLAY_POS=25:H-h-70"      >> $GITHUB_ENV ;;
+            bottomright) echo "OVERLAY_POS=W-w-25:H-h-70"  >> $GITHUB_ENV ;;
+            *)           echo "OVERLAY_POS=W-w-25:25"      >> $GITHUB_ENV ;;
           esac
 
-      # ─── 5. Playlist banao ─────────────────────────────────────────────────
+      # ─── 5. Playlist ────────────────────────────────────────────────────────
       - name: Build Playlist
         run: |
           cat > playlist.txt << 'PLAYLIST'
           file 'https://www.dropbox.com/scl/fi/zv7z1sbm81ohxp04a5anx/lv_0_20260529230011.mp4?rlkey=gpuytnfr9wtp2yc1mzn5l0hil&st=4woqwd9c&raw=1'
           file 'https://www.dropbox.com/scl/fi/zv7z1sbm81ohxp04a5anx/lv_0_20260529230011.mp4?rlkey=gpuytnfr9wtp2yc1mzn5l0hil&st=4woqwd9c&raw=1'
           PLAYLIST
-
           echo "=== Playlist ==="
           cat playlist.txt
 
-      # ─── 6. Infinite loop stream with logo overlay ─────────────────────────
-      - name: Start 24/7 HD Stream with Logo
+      # ─── 6. THE MAIN STREAM ─────────────────────────────────────────────────
+      - name: Start 24/7 Stream — Animated Logo + Golden Ticker
         run: |
           echo "=============================="
-          echo "Stream shuru: $(date)"
+          echo "🚀 Stream shuru: $(date)"
           echo "Quality: $QUALITY | Bitrate: $VBR"
-          echo "Logo Position: $LOGO_POS ($OVERLAY_POS)"
+          echo "Logo: $LOGO_POS ($OVERLAY_POS)"
           echo "=============================="
 
           FAIL_COUNT=0
 
+          # Ticker text — tripled so scroll seamless lage
+          SCROLL="${TICKER}     ${TICKER}     ${TICKER}"
+
           while true; do
+            echo "[$(date)] FFmpeg start ho raha hai (attempt: $((FAIL_COUNT+1)))"
+
             ffmpeg \
               -re \
               -stream_loop -1 \
@@ -122,13 +127,58 @@ jobs:
               -protocol_whitelist file,http,https,tcp,tls,crypto \
               -i playlist.txt \
               -i logo.png \
-              -filter_complex \
-                "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,\
-                 pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,\
-                 setsar=1,fps=30[base];\
-                 [1:v]format=rgba,colorchannelmixer=aa=0.85[logo];\
-                 [base][logo]overlay=${OVERLAY_POS}:format=auto[outv]" \
-              -map "[outv]" \
+              -filter_complex "
+                [0:v]
+                  scale=1920:1080:force_original_aspect_ratio=decrease,
+                  pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,
+                  setsar=1,
+                  fps=30
+                [base];
+
+                [1:v]
+                  format=rgba,
+                  colorchannelmixer=aa=0.92
+                [logo_plain];
+
+                [logo_plain]
+                  zoompan=
+                    z='1.04+0.04*sin(2*PI*t/3)':
+                    x='iw/2-(iw/zoom/2)':
+                    y='ih/2-(ih/zoom/2)':
+                    d=1:s=220x220:fps=30
+                [logo_anim];
+
+                [base][logo_anim]
+                  overlay=${OVERLAY_POS}:format=auto
+                [with_logo];
+
+                [with_logo]
+                  drawbox=
+                    x=0:y=H-52:w=W:h=52:
+                    color=0x1a1400@0.82:t=fill,
+
+                  drawbox=
+                    x=0:y=H-52:w=W:h=2:
+                    color=0xFFD700@1.0:t=fill,
+
+                  drawbox=
+                    x=0:y=H-1:w=W:h=1:
+                    color=0xFFD700@1.0:t=fill,
+
+                  drawtext=
+                    text='${SCROLL}':
+                    fontsize=26:
+                    fontcolor=0xFFE566:
+                    fontcolor_expr='0xFFE566@(0.7+0.3*sin(2*PI*t/2))':
+                    shadowcolor=0xAA7700@0.8:
+                    shadowx=2:shadowy=2:
+                    x='W - mod(t*220\, W + tw)':
+                    y=H-36:
+                    font=DejaVu-Sans-Bold
+
+                [out]
+              " \
+              -map "[out]" \
               -map 0:a \
               -c:v libx264 \
               -preset "$PRESET" \
@@ -153,18 +203,16 @@ jobs:
 
             EXIT_CODE=${PIPESTATUS[0]}
             FAIL_COUNT=$((FAIL_COUNT + 1))
-            echo "[$(date)] FFmpeg exit code: $EXIT_CODE — Restart #$FAIL_COUNT"
+            echo "[$(date)] ⚠️  FFmpeg band hua — exit: $EXIT_CODE | restart #$FAIL_COUNT"
 
-            # Zyada failures pe thoda zyada wait (network issue ho sakta hai)
-            if [ "$FAIL_COUNT" -gt 5 ]; then
-              echo "Zyada failures — 30s wait..."
-              sleep 30
-            else
-              sleep 5
+            # Smart wait: zyada failures = zyada wait
+            if   [ "$FAIL_COUNT" -gt 10 ]; then sleep 60
+            elif [ "$FAIL_COUNT" -gt 5  ]; then sleep 30
+            else                                sleep 5
             fi
           done
 
-      # ─── 7. Log upload ──────────────────────────────────────────────────────
+      # ─── 7. Log upload ───────────────────────────────────────────────────────
       - name: Upload Stream Log
         if: always()
         uses: actions/upload-artifact@v4
