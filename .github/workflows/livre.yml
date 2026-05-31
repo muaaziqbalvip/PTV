@@ -95,7 +95,7 @@ jobs:
       - name: Build Playlist
         run: |
           cat > playlist.txt << 'PLAYLIST'
-          file 'https://muaaziqbalvip.github.io/Milive2/0.mp4'
+          file 'https://mividstore.netlify.app/videoplayback%20(1).mp4'
           file 'https://muaaziqbalvip.github.io/Milive2/0.mp4'
           PLAYLIST
 
