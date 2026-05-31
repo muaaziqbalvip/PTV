@@ -1,9 +1,9 @@
 # â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
-# â•‘          ðŸŽ¬ 24/7 YouTube Live Stream â€” PRO v3                   â•‘
-# â•‘   Pre-Download Â· Error Screen Â· Smooth Loop Â· Logo Overlay      â•‘
+# â•‘          ðŸŽ¬ 24/7 YouTube Live Stream â€” PRO v4                   â•‘
+# â•‘   Re-Encode Fix Â· Next Up Overlay Â· Smooth Loop Â· No Errors     â•‘
 # â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-name: ðŸŽ¬ 24/7 YouTube Live Stream (Pro v3)
+name: ðŸŽ¬ 24/7 YouTube Live Stream (Pro v4)
 
 on:
   workflow_dispatch:
@@ -38,39 +38,36 @@ jobs:
 
     steps:
 
-      # â”€â”€ Step 1: FFmpeg Install â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      - name: ðŸ”§ Install FFmpeg & Tools
+      # â”€â”€ Step 1: Install â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      - name: ðŸ”§ Install FFmpeg
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg curl wget
           echo "âœ… FFmpeg: $(ffmpeg -version 2>&1 | head -1)"
 
-      # â”€â”€ Step 2: Quality Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      # â”€â”€ Step 2: Quality â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - name: âš™ï¸  Configure Quality
         run: |
           case "$QUALITY" in
             low)
-              echo "VBR=3000k"       >> $GITHUB_ENV
-              echo "MAXR=3500k"      >> $GITHUB_ENV
-              echo "BUFS=6000k"      >> $GITHUB_ENV
-              echo "PRESET=faster"   >> $GITHUB_ENV
-              ;;
+              echo "VBR=3000k"     >> $GITHUB_ENV
+              echo "MAXR=3500k"    >> $GITHUB_ENV
+              echo "BUFS=6000k"    >> $GITHUB_ENV
+              echo "PRESET=faster" >> $GITHUB_ENV ;;
             high)
-              echo "VBR=6000k"       >> $GITHUB_ENV
-              echo "MAXR=6500k"      >> $GITHUB_ENV
-              echo "BUFS=12000k"     >> $GITHUB_ENV
-              echo "PRESET=fast"     >> $GITHUB_ENV
-              ;;
+              echo "VBR=6000k"     >> $GITHUB_ENV
+              echo "MAXR=6500k"    >> $GITHUB_ENV
+              echo "BUFS=12000k"   >> $GITHUB_ENV
+              echo "PRESET=fast"   >> $GITHUB_ENV ;;
             *)
-              echo "VBR=4500k"       >> $GITHUB_ENV
-              echo "MAXR=5000k"      >> $GITHUB_ENV
-              echo "BUFS=9000k"      >> $GITHUB_ENV
-              echo "PRESET=veryfast" >> $GITHUB_ENV
-              ;;
+              echo "VBR=4500k"     >> $GITHUB_ENV
+              echo "MAXR=5000k"    >> $GITHUB_ENV
+              echo "BUFS=9000k"    >> $GITHUB_ENV
+              echo "PRESET=veryfast" >> $GITHUB_ENV ;;
           esac
 
       # â”€â”€ Step 3: Logo Position â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      - name: ðŸ“Œ Set Logo Position
+      - name: ðŸ“Œ Logo Position
         run: |
           case "$LOGO_POS" in
             topleft)     echo "OVERLAY_POS=20:20"         >> $GITHUB_ENV ;;
@@ -79,7 +76,7 @@ jobs:
             *)           echo "OVERLAY_POS=W-w-20:20"     >> $GITHUB_ENV ;;
           esac
 
-      # â”€â”€ Step 4: Logo Download â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      # â”€â”€ Step 4: Logo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - name: ðŸ–¼ï¸  Prepare Logo
         run: |
           curl -sL "$LOGO_URL" -o logo_raw.png || true
@@ -92,137 +89,204 @@ jobs:
             logo.png -y -loglevel quiet
           echo "âœ… Logo ready"
 
-      # â”€â”€ Step 5: â¬‡ï¸  PRE-DOWNLOAD VIDEOS (Main Fix) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      # Yeh sabse zaroori step hai:
-      # Network se seedha stream karne par video start mein lag aata tha
-      # Ab pehle sab videos download kar lo, phir local se stream karo
-      - name: â¬‡ï¸  Pre-Download All Videos
+      # â”€â”€ Step 5: Download + RE-ENCODE (Late SEI Fix) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      # FIX: Original video mein Late SEI / H264 encoding issues hain
+      # Solution: Download karo phir CLEAN re-encode karo yuv420p mein
+      # Yeh ensure karta hai:
+      #   - No Late SEI warnings
+      #   - No timestamp jumps
+      #   - Smooth concat between videos
+      #   - No lag at video start
+      - name: â¬‡ï¸  Download & Re-Encode Videos
         run: |
-          mkdir -p videos
+          mkdir -p videos raw
 
-          echo "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”"
-          echo "â¬‡ï¸  Video 1 download ho raha hai..."
-          echo "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”"
-          wget -q --show-progress \
-            --retry-connrefused \
-            --waitretry=5 \
-            --tries=5 \
-            "https://mividstore.netlify.app/videoplayback%20(1).mp4" \
-            -O videos/video1.mp4
+          # Video list: "URL|Title" format
+          declare -a VIDEOS=(
+            "https://mividstore.netlify.app/videoplayback%20(1).mp4|Video 1 - Main Show"
+            "https://muaaziqbalvip.github.io/Milive2/0.mp4|Video 2 - Special Mix"
+          )
 
-          echo "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”"
-          echo "â¬‡ï¸  Video 2 download ho raha hai..."
-          echo "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”"
-          wget -q --show-progress \
-            --retry-connrefused \
-            --waitretry=5 \
-            --tries=5 \
-            "https://muaaziqbalvip.github.io/Milive2/0.mp4" \
-            -O videos/video2.mp4
+          TOTAL=${#VIDEOS[@]}
+          echo "TOTAL_VIDEOS=$TOTAL" >> $GITHUB_ENV
 
-          # â”€â”€ Verify downloads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-          echo ""
-          echo "=== Download Verification ==="
-          for i in 1 2; do
-            if [ -s "videos/video${i}.mp4" ]; then
-              SIZE=$(du -sh "videos/video${i}.mp4" | cut -f1)
-              DURATION=$(ffprobe -v quiet -show_entries format=duration \
-                -of csv=p=0 "videos/video${i}.mp4" 2>/dev/null | xargs printf "%.0f" || echo "?")
-              echo "âœ… Video $i â€” Size: $SIZE | Duration: ${DURATION}s"
-            else
-              echo "âŒ Video $i â€” DOWNLOAD FAILED!"
-              # Fallback: 5 second black screen with error text
+          # Titles save karo later use ke liye
+          for i in "${!VIDEOS[@]}"; do
+            IDX=$((i+1))
+            TITLE="${VIDEOS[$i]#*|}"
+            echo "$TITLE" > "videos/title${IDX}.txt"
+          done
+
+          for i in "${!VIDEOS[@]}"; do
+            IDX=$((i+1))
+            URL="${VIDEOS[$i]%%|*}"
+            TITLE="${VIDEOS[$i]#*|}"
+            NEXT_IDX=$(( (IDX % TOTAL) + 1 ))
+            NEXT_TITLE=$(cat "videos/title${NEXT_IDX}.txt")
+
+            echo "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”"
+            echo "â¬‡ï¸  Downloading Video $IDX: $TITLE"
+            echo "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”"
+
+            wget -q --show-progress \
+              --retry-connrefused --waitretry=5 --tries=5 \
+              "$URL" -O "raw/video${IDX}_raw.mp4" || true
+
+            if [ ! -s "raw/video${IDX}_raw.mp4" ]; then
+              echo "âŒ Download failed â€” creating error placeholder"
               ffmpeg -f lavfi \
-                -i "color=c=black:size=1920x1080:rate=30" \
+                -i "color=c=0x1a1a2e:size=1920x1080:rate=30" \
                 -f lavfi -i "aevalsrc=0:c=stereo:s=44100" \
-                -vf "drawtext=text='VIDEO ${i} LOAD FAILED':fontcolor=red:fontsize=60:x=(w-text_w)/2:y=(h-text_h)/2" \
-                -t 5 \
-                -c:v libx264 -c:a aac \
-                "videos/video${i}.mp4" -y -loglevel quiet
-              echo "âš ï¸  Video $i â€” Fallback error screen created"
+                -vf "drawtext=text='Download Failed\: $TITLE':fontcolor=red:fontsize=50:x=(w-text_w)/2:y=(h-text_h)/2" \
+                -t 5 -c:v libx264 -c:a aac \
+                "raw/video${IDX}_raw.mp4" -y -loglevel quiet
             fi
+
+            echo "ðŸ”„ Re-encoding Video $IDX (fixing SEI + timestamps)..."
+
+            # â”€â”€ RE-ENCODE: Yahi Late SEI fix karta hai â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            # -fps_mode cfr    = constant frame rate (no jumps)
+            # -vf scale+setsar = clean resolution
+            # yuv420p          = universal compatibility
+            # -movflags        = fast start for concat
+            # LAST 20 SECONDS MEIN "NEXT UP" OVERLAY INJECT KARO
+            # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            DURATION=$(ffprobe -v quiet -show_entries format=duration \
+              -of csv=p=0 "raw/video${IDX}_raw.mp4" | xargs printf "%.2f")
+            NEXT_UP_START=$(echo "$DURATION - 20" | bc)
+
+            # Agar video 20s se choti ho to from start show karo
+            if (( $(echo "$NEXT_UP_START < 0" | bc -l) )); then
+              NEXT_UP_START=0
+            fi
+
+            echo "   Duration: ${DURATION}s | Next-Up overlay at: ${NEXT_UP_START}s"
+
+            ffmpeg -i "raw/video${IDX}_raw.mp4" \
+              -vf "
+                scale=1920:1080:force_original_aspect_ratio=decrease,
+                pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,
+                setsar=1,
+                fps=fps=30,
+
+                drawbox=
+                  enable='gte(t,${NEXT_UP_START})':
+                  x=40:y=H-170:
+                  w=620:h=120:
+                  color=0x000000AA:t=fill,
+
+                drawbox=
+                  enable='gte(t,${NEXT_UP_START})':
+                  x=40:y=H-170:
+                  w=620:h=4:
+                  color=0xFF4444:t=fill,
+
+                drawtext=
+                  enable='gte(t,${NEXT_UP_START})':
+                  text='â–¶  NEXT UP':
+                  fontcolor=0xFF4444:
+                  fontsize=22:
+                  x=60:y=H-158:
+                  shadowcolor=black:shadowx=1:shadowy=1,
+
+                drawtext=
+                  enable='gte(t,${NEXT_UP_START})':
+                  text='${NEXT_TITLE}':
+                  fontcolor=white:
+                  fontsize=30:
+                  x=60:y=H-128:
+                  shadowcolor=black:shadowx=2:shadowy=2,
+
+                drawtext=
+                  enable='gte(t,${NEXT_UP_START})':
+                  text='youtube.com/@YourChannel':
+                  fontcolor=0xAAAAAA:
+                  fontsize=20:
+                  x=60:y=H-88:
+                  shadowcolor=black:shadowx=1:shadowy=1
+              " \
+              -c:v libx264 \
+              -preset fast \
+              -profile:v high \
+              -level:v 4.2 \
+              -pix_fmt yuv420p \
+              -fps_mode cfr \
+              -r 30 \
+              -b:v 5000k \
+              -maxrate 5500k \
+              -bufsize 10000k \
+              -g 60 \
+              -keyint_min 60 \
+              -sc_threshold 0 \
+              -c:a aac \
+              -b:a 160k \
+              -ar 44100 \
+              -ac 2 \
+              -avoid_negative_ts make_zero \
+              -movflags +faststart \
+              "videos/video${IDX}.mp4" -y \
+              2>&1 | grep -E "time=|Error|error" | tail -5
+
+            if [ -s "videos/video${IDX}.mp4" ]; then
+              SIZE=$(du -sh "videos/video${IDX}.mp4" | cut -f1)
+              echo "âœ… Video $IDX ready â€” $SIZE"
+            else
+              echo "âŒ Re-encode failed for video $IDX"
+            fi
+
           done
 
           echo ""
-          echo "âœ… All videos ready for local streaming"
+          echo "â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
+          echo "âœ… ALL VIDEOS READY â€” Starting stream"
+          echo "â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
 
-      # â”€â”€ Step 6: Build Local Playlist â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      - name: ðŸ“‹ Build Local Playlist
+      # â”€â”€ Step 6: Playlist â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      - name: ðŸ“‹ Build Playlist
         run: |
-          # Ab playlist mein LOCAL files hain â€” network dependency zero
-          # Videos 50 baar repeat = ~5 hours content guaranteed
-          PLAYLIST_FILE="playlist.txt"
-          > "$PLAYLIST_FILE"
-
-          for i in $(seq 1 50); do
-            echo "file 'videos/video1.mp4'" >> "$PLAYLIST_FILE"
-            echo "file 'videos/video2.mp4'" >> "$PLAYLIST_FILE"
+          > playlist.txt
+          for i in $(seq 1 60); do
+            echo "file 'videos/video1.mp4'" >> playlist.txt
+            echo "file 'videos/video2.mp4'" >> playlist.txt
           done
+          echo "âœ… Playlist: $(grep -c ^ playlist.txt) entries"
 
-          TOTAL=$(grep -c '^' "$PLAYLIST_FILE")
-          echo "âœ… Playlist ready â€” $TOTAL entries (local files)"
-
-      # â”€â”€ Step 7: ðŸ”´ MAIN STREAM LOOP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      # â”€â”€ Step 7: ðŸ”´ STREAM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - name: ðŸ”´ Start 24/7 Live Stream
         run: |
           echo "â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—"
-          echo "â•‘        ðŸŽ¬ STREAM STARTING...             â•‘"
-          echo "â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£"
-          echo "â•‘  ðŸ“… $(date '+%Y-%m-%d %H:%M:%S UTC')         â•‘"
-          echo "â•‘  ðŸŽšï¸  Quality : $QUALITY ($VBR)              â•‘"
-          echo "â•‘  ðŸ“Œ Logo    : $LOGO_POS                  â•‘"
+          echo "â•‘        ðŸŽ¬ STREAM LIVE !                  â•‘"
+          echo "â•‘  $(date '+%Y-%m-%d %H:%M:%S UTC')            â•‘"
           echo "â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
 
           FAIL_COUNT=0
           TOTAL_RESTARTS=0
 
-          # â”€â”€ Error screen banana ka function â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           make_error_screen() {
-            local ERROR_MSG="$1"
-            local TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
-            local RESTART_NUM="$2"
-
-            echo "ðŸŽ¬ Error screen generate ho rahi hai..."
-
-            # 10 second error screen with message on stream
+            local MSG="$1"
+            local NUM="$2"
             ffmpeg \
-              -f lavfi -i "color=c=0x1a1a2e:size=1920x1080:rate=30" \
+              -f lavfi -i "color=c=0x0d0d0d:size=1920x1080:rate=30" \
               -f lavfi -i "aevalsrc=0:c=stereo:s=44100" \
               -vf "
-                drawtext=text='âš  STREAM ERROR':
-                  fontcolor=0xFF4444:fontsize=72:
-                  x=(w-text_w)/2:y=350:
-                  shadowcolor=black:shadowx=3:shadowy=3,
-                drawtext=text='${ERROR_MSG}':
-                  fontcolor=white:fontsize=32:
-                  x=(w-text_w)/2:y=460:
-                  shadowcolor=black:shadowx=2:shadowy=2,
-                drawtext=text='Reconnecting... Restart \#${RESTART_NUM}':
-                  fontcolor=0xFFAA00:fontsize=36:
-                  x=(w-text_w)/2:y=540:
-                  shadowcolor=black:shadowx=2:shadowy=2,
-                drawtext=text='${TIMESTAMP}':
-                  fontcolor=0x888888:fontsize=28:
-                  x=(w-text_w)/2:y=620
+                drawbox=x=560:y=380:w=800:h=320:color=0x1a1a1a:t=fill,
+                drawbox=x=560:y=380:w=800:h=4:color=0xFF4444:t=fill,
+                drawtext=text='âš   STREAM ERROR':fontcolor=0xFF4444:fontsize=52:x=660:y=405:shadowcolor=black:shadowx=2:shadowy=2,
+                drawtext=text='${MSG}':fontcolor=white:fontsize=28:x=(w-text_w)/2:y=490:shadowcolor=black:shadowx=1:shadowy=1,
+                drawtext=text='Reconnecting...  Attempt ${NUM}':fontcolor=0xFFAA00:fontsize=32:x=(w-text_w)/2:y=550:shadowcolor=black:shadowx=2:shadowy=2,
+                drawtext=text='$(date +%H\\:%M\\:%S)':fontcolor=0x666666:fontsize=26:x=(w-text_w)/2:y=610
               " \
-              -t 10 \
-              -c:v libx264 -preset ultrafast \
-              -b:v 1000k -c:a aac -b:a 128k \
-              -ar 44100 -ac 2 \
-              -pix_fmt yuv420p \
-              -f flv \
-              "${RTMP_URL}/${STREAM_KEY}" \
-              2>/dev/null && echo "âœ… Error screen streamed" || echo "âš ï¸  Error screen bhi fail"
+              -t 8 \
+              -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
+              -b:v 1500k -c:a aac -b:a 128k -ar 44100 -ac 2 \
+              -f flv "${RTMP_URL}/${STREAM_KEY}" 2>/dev/null \
+              && echo "âœ… Error screen sent" || echo "âš ï¸  Error screen skipped"
           }
 
-          # â”€â”€ Main infinite loop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           while true; do
-            echo ""
-            echo "â–¶ï¸  [$(date '+%H:%M:%S')] Stream attempt #$((TOTAL_RESTARTS+1))"
-            echo "â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€"
+            echo "â–¶ï¸  [$(date '+%H:%M:%S')] Attempt #$((TOTAL_RESTARTS+1))"
 
-            # FFmpeg run karo aur stderr capture karo error screen ke liye
-            FFMPEG_STDERR_FILE=$(mktemp)
+            ERR_FILE=$(mktemp)
 
             ffmpeg \
               -re \
@@ -231,11 +295,7 @@ jobs:
               -i playlist.txt \
               -i logo.png \
               -filter_complex \
-                "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,\
-                 pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,\
-                 setsar=1,fps=fps=30[base];\
-                 [1:v]format=rgba,colorchannelmixer=aa=0.85[logo];\
-                 [base][logo]overlay=${OVERLAY_POS}:format=auto[outv]" \
+                "[0:v][1:v]overlay=${OVERLAY_POS}:format=auto[outv]" \
               -map "[outv]" \
               -map 0:a \
               -c:v libx264 \
@@ -246,68 +306,43 @@ jobs:
               -b:v "$VBR" \
               -maxrate "$MAXR" \
               -bufsize "$BUFS" \
-              -g 60 \
-              -keyint_min 60 \
-              -sc_threshold 0 \
+              -g 60 -keyint_min 60 -sc_threshold 0 \
               -pix_fmt yuv420p \
-              -c:a aac \
-              -b:a 160k \
-              -ar 44100 \
-              -ac 2 \
-              -avoid_negative_ts make_zero \
-              -fflags +genpts+igndts \
+              -fps_mode cfr \
+              -c:a aac -b:a 160k -ar 44100 -ac 2 \
               -flvflags no_duration_filesize \
               -f flv \
               "${RTMP_URL}/${STREAM_KEY}" \
-              2> >(tee "$FFMPEG_STDERR_FILE" >> stream.log)
+              2> >(tee "$ERR_FILE" >> stream.log)
 
-            EXIT_CODE=$?
-            TOTAL_RESTARTS=$((TOTAL_RESTARTS + 1))
+            EXIT=$?
+            TOTAL_RESTARTS=$((TOTAL_RESTARTS+1))
 
-            # â”€â”€ Exit code check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            if [ "$EXIT_CODE" -eq 0 ]; then
-              echo "âœ… Playlist complete â€” instant restart"
+            if [ "$EXIT" -eq 0 ]; then
+              echo "âœ… Playlist done â€” restarting instantly"
               FAIL_COUNT=0
-              rm -f "$FFMPEG_STDERR_FILE"
+              rm -f "$ERR_FILE"
               sleep 1
               continue
             fi
 
-            # â”€â”€ Error capture karo last line se â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            FAIL_COUNT=$((FAIL_COUNT + 1))
-            LAST_ERROR=$(tail -5 "$FFMPEG_STDERR_FILE" | \
-              grep -i "error\|failed\|invalid\|refused\|timeout\|broken" | \
-              tail -1 | \
-              sed 's/[^a-zA-Z0-9 :._-]//g' | \
-              cut -c1-60)
-            rm -f "$FFMPEG_STDERR_FILE"
+            FAIL_COUNT=$((FAIL_COUNT+1))
+            LAST_ERR=$(grep -i "error\|failed\|refused\|broken\|timeout" "$ERR_FILE" \
+              | tail -1 | sed 's/[^a-zA-Z0-9 :._-]//g' | cut -c1-55)
+            rm -f "$ERR_FILE"
+            [ -z "$LAST_ERR" ] && LAST_ERR="Exit code $EXIT"
 
-            if [ -z "$LAST_ERROR" ]; then
-              LAST_ERROR="Unknown error (exit code: $EXIT_CODE)"
+            echo "âŒ $LAST_ERR (fail #$FAIL_COUNT)"
+            make_error_screen "$LAST_ERR" "$TOTAL_RESTARTS"
+
+            if   [ "$FAIL_COUNT" -ge 10 ]; then sleep 60
+            elif [ "$FAIL_COUNT" -ge 5  ]; then sleep 30
+            else sleep 5
             fi
-
-            echo "âŒ Error: $LAST_ERROR"
-            echo "âš ï¸  Fail streak: $FAIL_COUNT"
-
-            # â”€â”€ Error screen live stream pe show karo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            make_error_screen "$LAST_ERROR" "$TOTAL_RESTARTS"
-
-            # â”€â”€ Smart wait before retry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            if   [ "$FAIL_COUNT" -ge 10 ]; then
-              echo "ðŸ”´ Too many failures â€” 60s wait..."
-              sleep 60
-            elif [ "$FAIL_COUNT" -ge 5 ]; then
-              echo "ðŸŸ¡ Multiple failures â€” 30s wait..."
-              sleep 30
-            else
-              echo "ðŸŸ¢ Retry in 5s..."
-              sleep 5
-            fi
-
           done
 
-      # â”€â”€ Step 8: Upload Log â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      - name: ðŸ“„ Upload Stream Log
+      # â”€â”€ Step 8: Logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      - name: ðŸ“„ Upload Log
         if: always()
         uses: actions/upload-artifact@v4
         with:
