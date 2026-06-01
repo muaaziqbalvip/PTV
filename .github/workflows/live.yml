@@ -93,12 +93,12 @@ jobs:
             "https://muaaziqbalvip.github.io/Milive2/0w.mp4|SURAH AL-WAQIA"
             "https://mividstore.netlify.app/videoplayback%20(1).mp4|SURAH YASEEN"
             "https://muaaziqbalvip.github.io/Milive2/0m.mp4|SURAH AL-Mulk"
-            "https://mividstore.netlify.app/videoplayback%20(1).mp4|SURAH AL-YASEEN"
+            "https://muaaziqbalvip.github.io/Milive2/0k.mp4|SURAH AL-KHAF"
             "https://muaaziqbalvip.github.io/Milive2/0w.mp4|SURAH AL-WAQIA"
             "https://mividstore.netlify.app/videoplayback%20(1).mp4|SURAH YASEEN"
           )
 
-          AD_URL="https://muaaziqbalvip.github.io/Milive2/0.mp4"
+          AD_URL="https://muaaziqbalvip.github.io/Milive2/000.mp4"
           AD_TITLE="--- Special OFFER"
 
           TOTAL=${#VIDEOS[@]}
