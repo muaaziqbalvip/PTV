@@ -21,7 +21,7 @@ on:
 jobs:
   stream:
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    timeout-minutes: 360
 
     env:
       STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
