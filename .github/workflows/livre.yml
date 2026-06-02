@@ -1,3 +1,6 @@
+name: 24/7 YouTube Live Stream (Pro)
+
+on:
   workflow_dispatch:
     inputs:
       logo_url:
@@ -12,8 +15,10 @@
         description: 'Quality: low (1080p/3Mbps) | mid (1080p/4.5Mbps) | high (1080p/6Mbps)'
         required: false
         default: 'mid'
-  schedule:
-    - cron: '0 */5 * * *'
+      playback_speed:
+        description: 'Playback speed: 0.5 | 0.75 | 1.0 | 1.25 | 1.5 | 2.0'
+        required: false
+        default: '1.0'
 
 jobs:
   stream:
@@ -26,107 +31,178 @@ jobs:
       LOGO_URL: ${{ github.event.inputs.logo_url || 'https://i.ibb.co/gZFSmCPw/file-00000000305071fa945b58b012ac072b-removebg-preview.png' }}
       LOGO_POS: ${{ github.event.inputs.logo_position || 'topright' }}
       QUALITY:  ${{ github.event.inputs.quality_preset || 'mid' }}
+      SPEED:    ${{ github.event.inputs.playback_speed || '1.0' }}
 
     steps:
-      # ─── 1. FFmpeg install ──────────────────────────────────────────────────
-      - name: Install FFmpeg
+      - name: Install FFmpeg + Fonts
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg curl
+          sudo apt-get install -y ffmpeg curl bc \
+            fonts-noto \
+            fonts-noto-color-emoji \
+            fonts-noto-cjk \
+            fonts-kacst \
+            fonts-freefont-ttf \
+            fonts-arabeyes \
+            fontconfig
+          fc-cache -fv
+          echo "=== Fonts installed ==="
 
-      # ─── 2. Download logo ───────────────────────────────────────────────────
       - name: Download Logo
         run: |
           curl -sL "$LOGO_URL" -o logo_raw.png || true
-
-          # Agar logo download fail ho to fallback transparent 1x1 pixel
           if [ ! -s logo_raw.png ]; then
-            echo "Logo download fail — fallback use ho raha hai"
             ffmpeg -f lavfi -i color=black@0:size=1x1:rate=1 \
               -frames:v 1 logo_raw.png -y -loglevel quiet
           fi
-
-          # Logo ko resize karo: max 180px wide, aspect ratio preserve
           ffmpeg -i logo_raw.png \
-            -vf "scale='min(280,iw)':-1:flags=lanczos" \
+            -vf "scale='min(300,iw)':-1:flags=lanczos" \
             logo.png -y -loglevel quiet
-
           echo "=== Logo ready ==="
-          file logo.png
 
-      # ─── 3. Quality settings set karo ──────────────────────────────────────
       - name: Set Quality Params
         run: |
           case "$QUALITY" in
             low)
-              echo "VBR=3000k"    >> $GITHUB_ENV
-              echo "MAXR=3000k"   >> $GITHUB_ENV
-              echo "BUFS=6000k"   >> $GITHUB_ENV
+              echo "VBR=3000k"     >> $GITHUB_ENV
+              echo "MAXR=3000k"    >> $GITHUB_ENV
+              echo "BUFS=6000k"    >> $GITHUB_ENV
               echo "PRESET=faster" >> $GITHUB_ENV
               ;;
             high)
-              echo "VBR=6000k"    >> $GITHUB_ENV
-              echo "MAXR=6000k"   >> $GITHUB_ENV
-              echo "BUFS=12000k"  >> $GITHUB_ENV
-              echo "PRESET=fast"  >> $GITHUB_ENV
+              echo "VBR=6000k"     >> $GITHUB_ENV
+              echo "MAXR=6000k"    >> $GITHUB_ENV
+              echo "BUFS=12000k"   >> $GITHUB_ENV
+              echo "PRESET=fast"   >> $GITHUB_ENV
               ;;
-            *)  # mid (default)
-              echo "VBR=4500k"    >> $GITHUB_ENV
-              echo "MAXR=4500k"   >> $GITHUB_ENV
-              echo "BUFS=9000k"   >> $GITHUB_ENV
-              echo "PRESET=veryfast" >> $GITHUB_ENV
+            *)
+              echo "VBR=4500k"        >> $GITHUB_ENV
+              echo "MAXR=4500k"       >> $GITHUB_ENV
+              echo "BUFS=9000k"       >> $GITHUB_ENV
+              echo "PRESET=veryfast"  >> $GITHUB_ENV
               ;;
           esac
 
-      # ─── 4. Logo position calculate karo ───────────────────────────────────
       - name: Set Logo Overlay Position
         run: |
           case "$LOGO_POS" in
-            topleft)     echo "OVERLAY_POS=20:20"          >> $GITHUB_ENV ;;
-            bottomleft)  echo "OVERLAY_POS=20:H-h-20"      >> $GITHUB_ENV ;;
-            bottomright) echo "OVERLAY_POS=W-w-20:H-h-20"  >> $GITHUB_ENV ;;
-            *)           echo "OVERLAY_POS=W-w-20:20"      >> $GITHUB_ENV ;;  # topright default
+            topleft)     echo "OVERLAY_POS=20:20"         >> $GITHUB_ENV ;;
+            bottomleft)  echo "OVERLAY_POS=20:H-h-20"     >> $GITHUB_ENV ;;
+            bottomright) echo "OVERLAY_POS=W-w-20:H-h-20" >> $GITHUB_ENV ;;
+            *)           echo "OVERLAY_POS=W-w-20:20"     >> $GITHUB_ENV ;;
           esac
 
-      # ─── 5. Playlist banao ─────────────────────────────────────────────────
-      - name: Build Playlist
+      - name: Build Speed Filters
         run: |
-          cat > playlist.txt << 'PLAYLIST'
-          file 'https://mividstore.netlify.app/videoplayback%20(1).mp4'
-          file 'https://muaaziqbalvip.github.io/Milive2/0.mp4'
-          PLAYLIST
+          SPD="$SPEED"
+          PTS_VAL=$(echo "scale=6; 1/$SPD" | bc)
+          echo "VIDEO_SPEED_FILTER=setpts=${PTS_VAL}*PTS" >> $GITHUB_ENV
+          SPEED_FLOAT=$(echo "$SPD" | bc -l)
+          if (( $(echo "$SPEED_FLOAT < 0.5" | bc -l) )); then
+            INNER=$(echo "scale=6; $SPEED_FLOAT / 0.5" | bc)
+            echo "AUDIO_SPEED_FILTER=atempo=0.5,atempo=${INNER}" >> $GITHUB_ENV
+          elif (( $(echo "$SPEED_FLOAT > 2.0" | bc -l) )); then
+            INNER=$(echo "scale=6; $SPEED_FLOAT / 2.0" | bc)
+            echo "AUDIO_SPEED_FILTER=atempo=2.0,atempo=${INNER}" >> $GITHUB_ENV
+          else
+            echo "AUDIO_SPEED_FILTER=atempo=${SPD}" >> $GITHUB_ENV
+          fi
+          echo "=== Speed: ${SPD}x | PTS: ${PTS_VAL} ==="
 
-          echo "=== Playlist ==="
-          cat playlist.txt
+      - name: Find Arabic Urdu Font
+        run: |
+          FONT_PATH=""
+          for f in \
+            "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf" \
+            "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf" \
+            "/usr/share/fonts/truetype/kacst/KacstOne.ttf" \
+            "/usr/share/fonts/truetype/arabeyes/ae_AlArabiya.ttf" \
+            "/usr/share/fonts/truetype/freefont/FreeSerif.ttf" \
+            "/usr/share/fonts/truetype/freefont/FreeSans.ttf"; do
+            if [ -f "$f" ]; then
+              FONT_PATH="$f"
+              break
+            fi
+          done
+          if [ -z "$FONT_PATH" ]; then
+            FONT_PATH=$(fc-list | grep -i "noto\|arabic\|kacst" | head -1 | cut -d: -f1)
+          fi
+          [ -z "$FONT_PATH" ] && FONT_PATH="/usr/share/fonts/truetype/freefont/FreeSans.ttf"
+          echo "ARABIC_FONT=${FONT_PATH}" >> $GITHUB_ENV
+          echo "=== Font selected: $FONT_PATH ==="
 
-      # ─── 6. Infinite loop stream with logo overlay ─────────────────────────
-      - name: Start 24/7 HD Stream with Logo
+      # ─── Main Stream Loop ───────────────────────────────────────────────────
+      - name: Start 24/7 HD Stream
         run: |
           echo "=============================="
           echo "Stream shuru: $(date)"
-          echo "Quality: $QUALITY | Bitrate: $VBR"
-          echo "Logo Position: $LOGO_POS ($OVERLAY_POS)"
+          echo "Quality: $QUALITY | Speed: ${SPEED}x"
+          echo "Font: $ARABIC_FONT"
           echo "=============================="
 
+          VIDEOS=(
+            "https://muaaziqbalvip.github.io/Milive2/0r.mp4|SURAH REHMAN"
+            "https://muaaziqbalvip.github.io/Milive2/0s.mp4|SURAH SAJDA"
+            "https://muaaziqbalvip.github.io/Milive2/0m.mp4|SURAH AL-Mulk"
+            "https://muaaziqbalvip.github.io/Milive2/0k.mp4|SURAH AL-KHAF"
+            "https://muaaziqbalvip.github.io/Milive2/0w.mp4|SURAH AL-WAQIA"
+            "https://mividstore.netlify.app/videoplayback%20(1).mp4|SURAH YASEEN"
+          )
+
+          AD_URL="https://muaaziqbalvip.github.io/Milive2/000.mp4"
+          AD_TITLE="--- Special OFFER"
+
+          TOTAL=${#VIDEOS[@]}
           FAIL_COUNT=0
 
-          while true; do
+          # ── Ticker text — Urdu + Arabic + Emoji ──
+          # NOTE: colon : ko \: se escape karo drawtext me
+          TICKER="  Bismillah hir Rahman nir Raheem  |  Like Karen aur Channel Subscribe Karen  |  Bell icon zaroor dabayein  |  Nabi Kareem S.A.W ne farmaya - jo roz Quran padhe Allah uske darajat buland karta hai  |  Contact - 03001234567  |  Allah Akbar - Allah tamam Muslmanon ki hifazat farmaye  |  Channel ko Share Karen - Sawab kamayein  |  Hadees - Jis ne Surah Kahf Juma ko padhi use Noor mila  |  MiTV Network - Qurani Content 24/7  "
+
+          stream_video() {
+            local VIDEO_URL="$1"
+            local NOW_TITLE="$2"
+            local NEXT_TITLE="$3"
+
             ffmpeg \
               -re \
-              -stream_loop -1 \
-              -f concat \
-              -safe 0 \
-              -protocol_whitelist file,http,https,tcp,tls,crypto \
-              -i playlist.txt \
+              -i "$VIDEO_URL" \
               -i logo.png \
               -filter_complex \
-                "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,\
+                "[0:v]${VIDEO_SPEED_FILTER},\
+                 scale=1920:1080:force_original_aspect_ratio=decrease,\
                  pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,\
                  setsar=1,fps=30[base];\
                  [1:v]format=rgba,colorchannelmixer=aa=0.85[logo];\
-                 [base][logo]overlay=${OVERLAY_POS}:format=auto[outv]" \
+                 [base][logo]overlay=${OVERLAY_POS}:format=auto[withlogo];\
+                 [withlogo]\
+                 drawbox=x=0:y=968:w=1920:h=112:color=0x0a0a1a@0.93:t=fill,\
+                 drawbox=x=0:y=968:w=1920:h=3:color=0xFFD700@1.0:t=fill,\
+                 drawtext=\
+                   fontfile='${ARABIC_FONT}':\
+                   text='NOW\\: ${NOW_TITLE}':\
+                   fontsize=30:fontcolor=white:\
+                   box=1:boxcolor=black@0.65:boxborderw=8:\
+                   x=20:y=912:\
+                   shadowx=2:shadowy=2,\
+                 drawtext=\
+                   fontfile='${ARABIC_FONT}':\
+                   text='NEXT\\: ${NEXT_TITLE}':\
+                   fontsize=25:fontcolor=0xFFD700:\
+                   box=1:boxcolor=black@0.65:boxborderw=8:\
+                   x=20:y=948:\
+                   shadowx=2:shadowy=2,\
+                 drawtext=\
+                   fontfile='${ARABIC_FONT}':\
+                   text='${TICKER}':\
+                   fontsize=27:\
+                   fontcolor=0xFFFFFF:\
+                   shadowx=1:shadowy=1:shadowcolor=black@0.9:\
+                   x=1920-mod(2*t*50\\,1920+tw):\
+                   y=988[outv];\
+                 [0:a]${AUDIO_SPEED_FILTER}[outa]" \
               -map "[outv]" \
-              -map 0:a \
+              -map "[outa]" \
               -c:v libx264 \
               -preset "$PRESET" \
               -tune zerolatency \
@@ -147,21 +223,44 @@ jobs:
               -f flv \
               "${RTMP_URL}/${STREAM_KEY}" \
               2>&1 | tee -a stream.log
+          }
 
-            EXIT_CODE=${PIPESTATUS[0]}
+          while true; do
+            for (( i=0; i<TOTAL; i++ )); do
+
+              CURRENT_ENTRY="${VIDEOS[$i]}"
+              CURRENT_URL="${CURRENT_ENTRY%%|*}"
+              CURRENT_TITLE="${CURRENT_ENTRY##*|}"
+
+              NEXT_INDEX=$(( (i+1) % TOTAL ))
+              NEXT_ENTRY="${VIDEOS[$NEXT_INDEX]}"
+              NEXT_TITLE="${NEXT_ENTRY##*|}"
+
+              echo "=============================="
+              echo "[$(date)] NOW: $CURRENT_TITLE | Speed: ${SPEED}x"
+              echo "[$(date)] NEXT: $NEXT_TITLE"
+              echo "=============================="
+
+              stream_video "$CURRENT_URL" "$CURRENT_TITLE" "$NEXT_TITLE"
+              EXIT_CODE=$?
+              echo "[$(date)] Video done. Exit: $EXIT_CODE"
+
+              echo "[$(date)] AD chal rahi hai..."
+              stream_video "$AD_URL" "$AD_TITLE" "$NEXT_TITLE"
+              echo "[$(date)] AD khatam."
+
+              sleep 2
+            done
+
+            echo "[$(date)] Playlist complete — restart ho raha hai..."
             FAIL_COUNT=$((FAIL_COUNT + 1))
-            echo "[$(date)] FFmpeg exit code: $EXIT_CODE — Restart #$FAIL_COUNT"
-
-            # Zyada failures pe thoda zyada wait (network issue ho sakta hai)
             if [ "$FAIL_COUNT" -gt 5 ]; then
-              echo "Zyada failures — 30s wait..."
               sleep 30
             else
-              sleep 5
+              sleep 3
             fi
           done
 
-      # ─── 7. Log upload ──────────────────────────────────────────────────────
       - name: Upload Stream Log
         if: always()
         uses: actions/upload-artifact@v4
