@@ -15,8 +15,10 @@ on:
         description: 'Quality: low (1080p/3Mbps) | mid (1080p/4.5Mbps) | high (1080p/6Mbps)'
         required: false
         default: 'mid'
-  schedule:
-    - cron: '0 */5 * * *'
+      playback_speed:
+        description: 'Playback speed: 0.5 | 0.75 | 1.0 | 1.25 | 1.5 | 2.0'
+        required: false
+        default: '1.0'
 
 jobs:
   stream:
@@ -29,6 +31,7 @@ jobs:
       LOGO_URL: ${{ github.event.inputs.logo_url || 'https://i.ibb.co/gZFSmCPw/file-00000000305071fa945b58b012ac072b-removebg-preview.png' }}
       LOGO_POS: ${{ github.event.inputs.logo_position || 'topright' }}
       QUALITY:  ${{ github.event.inputs.quality_preset || 'mid' }}
+      SPEED:    ${{ github.event.inputs.playback_speed || '1.0' }}
 
     steps:
       - name: Install FFmpeg
@@ -80,15 +83,40 @@ jobs:
             *)           echo "OVERLAY_POS=W-w-20:20"     >> $GITHUB_ENV ;;
           esac
 
+      # ── Speed Filter Build karo ─────────────────────────────────────────────
+      - name: Build Speed Filters
+        run: |
+          SPD="$SPEED"
+
+          # Video: setpts = 1/speed * PTS
+          # bc se float division
+          PTS_VAL=$(echo "scale=6; 1/$SPD" | bc)
+          echo "VIDEO_SPEED_FILTER=setpts=${PTS_VAL}*PTS" >> $GITHUB_ENV
+
+          # Audio: atempo range 0.5–2.0 hai
+          # Agar speed < 0.5 ya > 2.0 ho toh chain karo
+          SPEED_FLOAT=$(echo "$SPD" | bc -l)
+
+          if (( $(echo "$SPEED_FLOAT <= 0.5" | bc -l) )); then
+            # 0.5x: double atempo
+            echo "AUDIO_SPEED_FILTER=atempo=0.5,atempo=1.0" >> $GITHUB_ENV
+          elif (( $(echo "$SPEED_FLOAT >= 2.0" | bc -l) )); then
+            # 2.0x: single atempo=2.0
+            echo "AUDIO_SPEED_FILTER=atempo=2.0" >> $GITHUB_ENV
+          else
+            echo "AUDIO_SPEED_FILTER=atempo=${SPD}" >> $GITHUB_ENV
+          fi
+
+          echo "Speed set: ${SPD}x | PTS: ${PTS_VAL} | Audio: atempo=${SPD}"
+
       # ─── Main Stream Loop ───────────────────────────────────────────────────
       - name: Start 24/7 HD Stream
         run: |
           echo "=============================="
           echo "Stream shuru: $(date)"
-          echo "Quality: $QUALITY | Bitrate: $VBR"
+          echo "Quality: $QUALITY | Bitrate: $VBR | Speed: ${SPEED}x"
           echo "=============================="
 
-          # ── Video list: URL|Title ──
           VIDEOS=(
             "https://muaaziqbalvip.github.io/Milive2/0r.mp4|SURAH REHMAN"
             "https://muaaziqbalvip.github.io/Milive2/0s.mp4|SURAH SAJDA"
@@ -104,117 +132,82 @@ jobs:
           TOTAL=${#VIDEOS[@]}
           FAIL_COUNT=0
 
-          # Infinite loop
+          # ── Reusable stream function ──
+          stream_video() {
+            local VIDEO_URL="$1"
+            local NOW_TITLE="$2"
+            local NEXT_TITLE="$3"
+
+            ffmpeg \
+              -re \
+              -i "$VIDEO_URL" \
+              -i logo.png \
+              -filter_complex \
+                "[0:v]${VIDEO_SPEED_FILTER},\
+                 scale=1920:1080:force_original_aspect_ratio=decrease,\
+                 pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,\
+                 setsar=1,fps=30[base];\
+                 [1:v]format=rgba,colorchannelmixer=aa=0.85[logo];\
+                 [base][logo]overlay=${OVERLAY_POS}:format=auto[withlogo];\
+                 [withlogo]drawtext=\
+                   text='NOW\\: ${NOW_TITLE}':fontsize=32:fontcolor=white:\
+                   box=1:boxcolor=black@0.6:boxborderw=8:\
+                   x=20:y=H-th-90:shadowx=2:shadowy=2,\
+                 drawtext=\
+                   text='NEXT\\: ${NEXT_TITLE}':fontsize=26:fontcolor=yellow:\
+                   box=1:boxcolor=black@0.6:boxborderw=8:\
+                   x=20:y=H-th-45:shadowx=2:shadowy=2[outv];\
+                 [0:a]${AUDIO_SPEED_FILTER}[outa]" \
+              -map "[outv]" \
+              -map "[outa]" \
+              -c:v libx264 \
+              -preset "$PRESET" \
+              -tune zerolatency \
+              -profile:v high \
+              -level 4.2 \
+              -b:v "$VBR" \
+              -maxrate "$MAXR" \
+              -bufsize "$BUFS" \
+              -g 60 \
+              -keyint_min 60 \
+              -sc_threshold 0 \
+              -pix_fmt yuv420p \
+              -c:a aac \
+              -b:a 160k \
+              -ar 44100 \
+              -ac 2 \
+              -flvflags no_duration_filesize \
+              -f flv \
+              "${RTMP_URL}/${STREAM_KEY}" \
+              2>&1 | tee -a stream.log
+          }
+
           while true; do
             for (( i=0; i<TOTAL; i++ )); do
 
-              # Current video info
               CURRENT_ENTRY="${VIDEOS[$i]}"
               CURRENT_URL="${CURRENT_ENTRY%%|*}"
               CURRENT_TITLE="${CURRENT_ENTRY##*|}"
 
-              # Next video info (wrap around)
               NEXT_INDEX=$(( (i+1) % TOTAL ))
               NEXT_ENTRY="${VIDEOS[$NEXT_INDEX]}"
               NEXT_TITLE="${NEXT_ENTRY##*|}"
 
               echo "=============================="
-              echo "[$(date)] NOW: $CURRENT_TITLE"
+              echo "[$(date)] NOW: $CURRENT_TITLE | Speed: ${SPEED}x"
               echo "[$(date)] NEXT: $NEXT_TITLE"
               echo "=============================="
 
-              # ── Play current video ──
-              ffmpeg \
-                -re \
-                -i "$CURRENT_URL" \
-                -i logo.png \
-                -filter_complex \
-                  "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,\
-                   pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,\
-                   setsar=1,fps=30[base];\
-                   [1:v]format=rgba,colorchannelmixer=aa=0.85[logo];\
-                   [base][logo]overlay=${OVERLAY_POS}:format=auto[withlogo];\
-                   [withlogo]drawtext=\
-                     text='NOW\\: ${CURRENT_TITLE}':fontsize=32:fontcolor=white:\
-                     box=1:boxcolor=black@0.6:boxborderw=8:\
-                     x=20:y=H-th-90:shadowx=2:shadowy=2,\
-                   drawtext=\
-                     text='NEXT\\: ${NEXT_TITLE}':fontsize=26:fontcolor=yellow:\
-                     box=1:boxcolor=black@0.6:boxborderw=8:\
-                     x=20:y=H-th-45:shadowx=2:shadowy=2[outv]" \
-                -map "[outv]" \
-                -map 0:a \
-                -c:v libx264 \
-                -preset "$PRESET" \
-                -tune zerolatency \
-                -profile:v high \
-                -level 4.2 \
-                -b:v "$VBR" \
-                -maxrate "$MAXR" \
-                -bufsize "$BUFS" \
-                -g 60 \
-                -keyint_min 60 \
-                -sc_threshold 0 \
-                -pix_fmt yuv420p \
-                -c:a aac \
-                -b:a 160k \
-                -ar 44100 \
-                -ac 2 \
-                -flvflags no_duration_filesize \
-                -f flv \
-                "${RTMP_URL}/${STREAM_KEY}" \
-                2>&1 | tee -a stream.log
+              stream_video "$CURRENT_URL" "$CURRENT_TITLE" "$NEXT_TITLE"
 
-              EXIT_CODE=${PIPESTATUS[0]}
+              EXIT_CODE=$?
               echo "[$(date)] Video done. Exit: $EXIT_CODE"
 
-              # ── Play Ad after each video ──
               echo "[$(date)] AD chal rahi hai..."
+              stream_video "$AD_URL" "$AD_TITLE" "$NEXT_TITLE"
+              echo "[$(date)] AD khatam."
 
-              ffmpeg \
-                -re \
-                -i "$AD_URL" \
-                -i logo.png \
-                -filter_complex \
-                  "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,\
-                   pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,\
-                   setsar=1,fps=30[base];\
-                   [1:v]format=rgba,colorchannelmixer=aa=0.85[logo];\
-                   [base][logo]overlay=${OVERLAY_POS}:format=auto[withlogo];\
-                   [withlogo]drawtext=\
-                     text='${AD_TITLE}':fontsize=32:fontcolor=white:\
-                     box=1:boxcolor=black@0.6:boxborderw=8:\
-                     x=20:y=H-th-90:shadowx=2:shadowy=2,\
-                   drawtext=\
-                     text='NEXT\\: ${NEXT_TITLE}':fontsize=26:fontcolor=yellow:\
-                     box=1:boxcolor=black@0.6:boxborderw=8:\
-                     x=20:y=H-th-45:shadowx=2:shadowy=2[outv]" \
-                -map "[outv]" \
-                -map 0:a \
-                -c:v libx264 \
-                -preset "$PRESET" \
-                -tune zerolatency \
-                -profile:v high \
-                -level 4.2 \
-                -b:v "$VBR" \
-                -maxrate "$MAXR" \
-                -bufsize "$BUFS" \
-                -g 60 \
-                -keyint_min 60 \
-                -sc_threshold 0 \
-                -pix_fmt yuv420p \
-                -c:a aac \
-                -b:a 160k \
-                -ar 44100 \
-                -ac 2 \
-                -flvflags no_duration_filesize \
-                -f flv \
-                "${RTMP_URL}/${STREAM_KEY}" \
-                2>&1 | tee -a stream.log
-
-              echo "[$(date)] AD khatam. Next video load ho rahi hai..."
               sleep 2
-
             done
 
             echo "[$(date)] Playlist complete — restart ho raha hai..."
@@ -224,7 +217,6 @@ jobs:
             else
               sleep 3
             fi
-
           done
 
       - name: Upload Stream Log
