@@ -14,11 +14,11 @@ on:
       quality_preset:
         description: 'Quality: low (1080p/3Mbps) | mid (1080p/4.5Mbps) | high (1080p/6Mbps)'
         required: false
-        default: 'mid'
+        default: 'high'
       playback_speed:
         description: 'Playback speed: 0.5 | 0.75 | 1.0 | 1.25 | 1.5 | 2.0'
         required: false
-        default: '1.0'
+        default: '0.5'
 
 jobs:
   stream:
@@ -41,12 +41,22 @@ jobs:
             fonts-noto \
             fonts-noto-color-emoji \
             fonts-noto-cjk \
+            fonts-noto-ui-core \
             fonts-kacst \
             fonts-freefont-ttf \
             fonts-arabeyes \
             fontconfig
+          # Noto Nastaliq Urdu — proper Urdu rendering font
+          sudo apt-get install -y fonts-noto-extra 2>/dev/null || true
+          # Try to get Noto Nastaliq directly if not in package
+          if [ ! -f "/usr/share/fonts/truetype/noto/NotoNastaliqUrdu-Regular.ttf" ]; then
+            sudo mkdir -p /usr/share/fonts/truetype/noto-extra
+            curl -sL "https://github.com/google/fonts/raw/main/ofl/notonastaliqurdu/NotoNastaliqUrdu%5Bwght%5D.ttf" \
+              -o /usr/share/fonts/truetype/noto-extra/NotoNastaliqUrdu-Regular.ttf 2>/dev/null || true
+          fi
           fc-cache -fv
           echo "=== Fonts installed ==="
+          fc-list | grep -i "noto\|arabic\|nastaliq\|urdu" | head -20
 
       - name: Download Logo
         run: |
@@ -113,6 +123,8 @@ jobs:
         run: |
           FONT_PATH=""
           for f in \
+            "/usr/share/fonts/truetype/noto-extra/NotoNastaliqUrdu-Regular.ttf" \
+            "/usr/share/fonts/truetype/noto/NotoNastaliqUrdu-Regular.ttf" \
             "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf" \
             "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf" \
             "/usr/share/fonts/truetype/kacst/KacstOne.ttf" \
@@ -125,7 +137,7 @@ jobs:
             fi
           done
           if [ -z "$FONT_PATH" ]; then
-            FONT_PATH=$(fc-list | grep -i "noto\|arabic\|kacst" | head -1 | cut -d: -f1)
+            FONT_PATH=$(fc-list | grep -i "nastaliq\|noto.*arabic\|kacst" | head -1 | cut -d: -f1)
           fi
           [ -z "$FONT_PATH" ] && FONT_PATH="/usr/share/fonts/truetype/freefont/FreeSans.ttf"
           echo "ARABIC_FONT=${FONT_PATH}" >> $GITHUB_ENV
@@ -157,7 +169,7 @@ jobs:
 
           # ── Ticker text — Urdu + Arabic + Emoji ──
           # NOTE: colon : ko \: se escape karo drawtext me
-          TICKER="  Bismillah hir Rahman nir Raheem  |  Like Karen aur Channel Subscribe Karen  |  Bell icon zaroor dabayein  |  Nabi Kareem S.A.W ne farmaya - jo roz Quran padhe Allah uske darajat buland karta hai  |  Contact - 03001234567  |  Allah Akbar - Allah tamam Muslmanon ki hifazat farmaye  |  Channel ko Share Karen - Sawab kamayein  |  Hadees - Jis ne Surah Kahf Juma ko padhi use Noor mila  |  MiTV Network - Qurani Content 24/7  "
+          TICKER="  Bismillah hir Rahman nir Raheem  |  Like Karen aur Channel Subscribe Karen  |  Bell icon zaroor dabayein  |  Nabi Kareem S.A.W ne farmaya - jo roz Quran padhe Allah uske darajat buland karta hai  |  Contact - 03062015326  |  Allah Akbar - Allah tamam Muslmanon ki hifazat farmaye  |  Channel ko Share Karen - Sawab kamayein  |  Hadees - Jis ne Surah Kahf Juma ko padhi use Noor mila  |  MUSLIM ISLAM Network - Qurani Content 24/7  "
 
           stream_video() {
             local VIDEO_URL="$1"
