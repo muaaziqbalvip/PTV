@@ -1,4 +1,3 @@
-afafa
 name: 24/7 YouTube Live Stream (Pro)
 
 on:
@@ -15,11 +14,11 @@ on:
       quality_preset:
         description: 'Quality: low (1080p/3Mbps) | mid (1080p/4.5Mbps) | high (1080p/6Mbps)'
         required: false
-        default: 'mid'
+        default: 'high'
       playback_speed:
         description: 'Playback speed: 0.5 | 0.75 | 1.0 | 1.25 | 1.5 | 2.0'
         required: false
-        default: '1.0'
+        default: '0.5'
 
 jobs:
   stream:
