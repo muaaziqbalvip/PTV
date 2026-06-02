@@ -14,11 +14,11 @@ on:
       quality_preset:
         description: 'Quality: low (1080p/3Mbps) | mid (1080p/4.5Mbps) | high (1080p/6Mbps)'
         required: false
-        default: 'high'
+        default: 'mid'
       playback_speed:
         description: 'Playback speed: 0.5 | 0.75 | 1.0 | 1.25 | 1.5 | 2.0'
         required: false
-        default: '0.5'
+        default: '1.0'
 
 jobs:
   stream:
@@ -34,19 +34,10 @@ jobs:
       SPEED:    ${{ github.event.inputs.playback_speed || '1.0' }}
 
     steps:
-      - name: Install FFmpeg + Fonts
+      - name: Install FFmpeg
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg curl bc \
-            fonts-noto \
-            fonts-noto-color-emoji \
-            fonts-noto-cjk \
-            fonts-kacst \
-            fonts-freefont-ttf \
-            fonts-arabeyes \
-            fontconfig
-          fc-cache -fv
-          echo "=== Fonts installed ==="
+          sudo apt-get install -y ffmpeg curl
 
       - name: Download Logo
         run: |
@@ -92,66 +83,38 @@ jobs:
             *)           echo "OVERLAY_POS=W-w-20:20"     >> $GITHUB_ENV ;;
           esac
 
+      # ── Speed Filter Build karo ─────────────────────────────────────────────
       - name: Build Speed Filters
         run: |
           SPD="$SPEED"
+
+          # Video: setpts = 1/speed * PTS
+          # bc se float division
           PTS_VAL=$(echo "scale=6; 1/$SPD" | bc)
           echo "VIDEO_SPEED_FILTER=setpts=${PTS_VAL}*PTS" >> $GITHUB_ENV
+
+          # Audio: atempo range 0.5–2.0 hai
+          # Agar speed < 0.5 ya > 2.0 ho toh chain karo
           SPEED_FLOAT=$(echo "$SPD" | bc -l)
-          if (( $(echo "$SPEED_FLOAT < 0.5" | bc -l) )); then
-            INNER=$(echo "scale=6; $SPEED_FLOAT / 0.5" | bc)
-            echo "AUDIO_SPEED_FILTER=atempo=0.5,atempo=${INNER}" >> $GITHUB_ENV
-          elif (( $(echo "$SPEED_FLOAT > 2.0" | bc -l) )); then
-            INNER=$(echo "scale=6; $SPEED_FLOAT / 2.0" | bc)
-            echo "AUDIO_SPEED_FILTER=atempo=2.0,atempo=${INNER}" >> $GITHUB_ENV
+
+          if (( $(echo "$SPEED_FLOAT <= 0.5" | bc -l) )); then
+            # 0.5x: double atempo
+            echo "AUDIO_SPEED_FILTER=atempo=0.5,atempo=1.0" >> $GITHUB_ENV
+          elif (( $(echo "$SPEED_FLOAT >= 2.0" | bc -l) )); then
+            # 2.0x: single atempo=2.0
+            echo "AUDIO_SPEED_FILTER=atempo=2.0" >> $GITHUB_ENV
           else
             echo "AUDIO_SPEED_FILTER=atempo=${SPD}" >> $GITHUB_ENV
           fi
-          echo "=== Speed: ${SPD}x | PTS: ${PTS_VAL} ==="
 
-      - name: Find Urdu Arabic Font
-        run: |
-          # Best font dhundo jo Urdu+Arabic+Emoji sab support kare
-          FONT_PATH=""
-          for f in \
-            "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf" \
-            "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf" \
-            "/usr/share/fonts/truetype/kacst/KacstOne.ttf" \
-            "/usr/share/fonts/truetype/arabeyes/ae_AlArabiya.ttf" \
-            "/usr/share/fonts/truetype/freefont/FreeSerif.ttf"; do
-            if [ -f "$f" ]; then
-              FONT_PATH="$f"
-              break
-            fi
-          done
-          if [ -z "$FONT_PATH" ]; then
-            FONT_PATH=$(fc-list | grep -i "noto\|arabic\|urdu" | head -1 | cut -d: -f1 || echo "")
-          fi
-          if [ -z "$FONT_PATH" ]; then
-            FONT_PATH="/usr/share/fonts/truetype/freefont/FreeSans.ttf"
-          fi
-          echo "ARABIC_FONT=${FONT_PATH}" >> $GITHUB_ENV
-          echo "=== Font: $FONT_PATH ==="
-
-          # Emoji font
-          EMOJI_FONT=""
-          for ef in \
-            "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf" \
-            "/usr/share/fonts/truetype/noto/NotoEmoji-Regular.ttf"; do
-            if [ -f "$ef" ]; then
-              EMOJI_FONT="$ef"
-              break
-            fi
-          done
-          echo "EMOJI_FONT=${EMOJI_FONT}" >> $GITHUB_ENV
-          echo "=== Emoji Font: $EMOJI_FONT ==="
+          echo "Speed set: ${SPD}x | PTS: ${PTS_VAL} | Audio: atempo=${SPD}"
 
       # ─── Main Stream Loop ───────────────────────────────────────────────────
       - name: Start 24/7 HD Stream
         run: |
           echo "=============================="
           echo "Stream shuru: $(date)"
-          echo "Quality: $QUALITY | Speed: ${SPEED}x"
+          echo "Quality: $QUALITY | Bitrate: $VBR | Speed: ${SPEED}x"
           echo "=============================="
 
           VIDEOS=(
@@ -169,22 +132,11 @@ jobs:
           TOTAL=${#VIDEOS[@]}
           FAIL_COUNT=0
 
-          # ── Ticker messages — Urdu + Arabic + Emoji ──
-          # FFmpeg drawtext me special chars escape karne padte hain
-          # Single quotes aur backslash carefully use kiye hain
-          TICKER="  🌙 بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ  ✨  |  📖 قرآن پاک سنیں اور دل کو سکون دیں  |  💚 Like Karen aur Channel Subscribe Karen  🔔  |  🕌 نبی کریم ﷺ نے فرمایا: جو شخص روزانہ قرآن پڑھے اللہ اس کے درجات بلند فرماتا ہے  |  📲 Contact: 03062015326  |  ☪️ اللہ اکبر — اللہ تمام مسلمانوں کی حفاظت فرمائے  |  🌟 Channel ko Share Karen — Sawab kamayein  🌟  |  📿 حدیث: مَنْ قَرَأَ سُورَةَ الْكَهْفِ فِي يَوْمِ الْجُمُعَةِ أَضَاءَ لَهُ مِنَ النُّورِ  |  💛 Bell icon dabayein taake koi video miss na ho  🔔  |  🤲 دعا: رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ  |  ❤️ Muslim islam Network — Qurani Content 24/7  "
-
-          # Escape karo FFmpeg ke liye
-          TICKER_ESCAPED=$(echo "$TICKER" | sed "s/'/\\\\'/g" | sed 's/:/\\:/g')
-
+          # ── Reusable stream function ──
           stream_video() {
             local VIDEO_URL="$1"
             local NOW_TITLE="$2"
             local NEXT_TITLE="$3"
-
-            # Ticker speed — negative x = right se left scroll
-            # Speed: -2 slow, -3 normal, -5 fast
-            local TICKER_X="W-2*t*45"
 
             ffmpeg \
               -re \
@@ -197,39 +149,14 @@ jobs:
                  setsar=1,fps=30[base];\
                  [1:v]format=rgba,colorchannelmixer=aa=0.85[logo];\
                  [base][logo]overlay=${OVERLAY_POS}:format=auto[withlogo];\
-                 [withlogo]\
+                 [withlogo]drawtext=\
+                   text='NOW\\: ${NOW_TITLE}':fontsize=32:fontcolor=white:\
+                   box=1:boxcolor=black@0.6:boxborderw=8:\
+                   x=20:y=H-th-90:shadowx=2:shadowy=2,\
                  drawtext=\
-                   fontfile='${ARABIC_FONT}':\
-                   text='NOW\\: ${NOW_TITLE}':\
-                   fontsize=32:fontcolor=white:\
-                   box=1:boxcolor=black@0.65:boxborderw=10:\
-                   x=20:y=H-th-115:\
-                   shadowx=2:shadowy=2,\
-                 drawtext=\
-                   fontfile='${ARABIC_FONT}':\
-                   text='NEXT\\: ${NEXT_TITLE}':\
-                   fontsize=26:fontcolor=yellow:\
-                   box=1:boxcolor=black@0.65:boxborderw=10:\
-                   x=20:y=H-th-68:\
-                   shadowx=2:shadowy=2,\
-                 drawbox=\
-                   x=0:y=H-52:\
-                   w=W:h=52:\
-                   color=0x1a1a2e@0.92:\
-                   t=fill,\
-                 drawbox=\
-                   x=0:y=H-54:\
-                   w=W:h=3:\
-                   color=0xFFD700@1.0:\
-                   t=fill,\
-                 drawtext=\
-                   fontfile='${ARABIC_FONT}':\
-                   text='${TICKER_ESCAPED}':\
-                   fontsize=28:\
-                   fontcolor=0xFFFFFF:\
-                   shadowx=1:shadowy=1:shadowcolor=black@0.8:\
-                   x=W-mod(2*t*45\\,W+tw):\
-                   y=H-42[outv];\
+                   text='NEXT\\: ${NEXT_TITLE}':fontsize=26:fontcolor=yellow:\
+                   box=1:boxcolor=black@0.6:boxborderw=8:\
+                   x=20:y=H-th-45:shadowx=2:shadowy=2[outv];\
                  [0:a]${AUDIO_SPEED_FILTER}[outa]" \
               -map "[outv]" \
               -map "[outa]" \
@@ -272,6 +199,7 @@ jobs:
               echo "=============================="
 
               stream_video "$CURRENT_URL" "$CURRENT_TITLE" "$NEXT_TITLE"
+
               EXIT_CODE=$?
               echo "[$(date)] Video done. Exit: $EXIT_CODE"
 
