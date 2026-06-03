@@ -1,6 +1,8 @@
 name: 24/7 YouTube Live Stream (Pro)
 
 on:
+  schedule:
+  - cron: '*/347 * * * *'   # Har 347 minute
   workflow_dispatch:
     inputs:
       logo_url:
