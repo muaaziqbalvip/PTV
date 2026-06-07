@@ -1,0 +1,296 @@
+name: 24/7 YouTube Live Stream (Pro)
+
+on:
+  workflow_dispatch:
+    inputs:
+      logo_url:
+        description: 'Logo image URL (PNG with transparency preferred)'
+        required: false
+        default: 'https://i.ibb.co/gZFSmCPw/file-00000000305071fa945b58b012ac072b-removebg-preview.png'
+      logo_position:
+        description: 'Logo position: topleft / topright / bottomleft / bottomright'
+        required: false
+        default: 'topright'
+      quality_preset:
+        description: 'Quality: low (1080p/3Mbps) | mid (1080p/4.5Mbps) | high (1080p/6Mbps)'
+        required: false
+        default: 'mid'
+      playback_speed:
+        description: 'Video playback speed: 0.5 (slow) | 1.0 (normal) | 1.5 (fast) | 2.0 (very fast)'
+        required: false
+        default: '1.0'
+  schedule:
+    - cron: '0 */5 * * *'
+
+jobs:
+  stream:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+
+    env:
+      STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
+      RTMP_URL: 'rtmp://a.rtmp.youtube.com/live2'
+      LOGO_URL: ${{ github.event.inputs.logo_url || 'https://i.ibb.co/LzVJvDVz/file-00000000e55c7206934d363686b152fe.png' }}
+      LOGO_POS: ${{ github.event.inputs.logo_position || 'topright' }}
+      QUALITY:  ${{ github.event.inputs.quality_preset || 'mid' }}
+      SPEED:    ${{ github.event.inputs.playback_speed || '1.0' }}
+
+    steps:
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg curl
+
+      - name: Download Logo
+        run: |
+          curl -sL "$LOGO_URL" -o logo_raw.png || true
+          if [ ! -s logo_raw.png ]; then
+            ffmpeg -f lavfi -i color=black@0:size=1x1:rate=1 \
+              -frames:v 1 logo_raw.png -y -loglevel quiet
+          fi
+          ffmpeg -i logo_raw.png \
+            -vf "scale='min(300,iw)':-1:flags=lanczos" \
+            logo.png -y -loglevel quiet
+          echo "=== Logo ready ==="
+
+      - name: Set Quality Params
+        run: |
+          case "$QUALITY" in
+            low)
+              echo "VBR=3000k"     >> $GITHUB_ENV
+              echo "MAXR=3000k"    >> $GITHUB_ENV
+              echo "BUFS=6000k"    >> $GITHUB_ENV
+              echo "PRESET=faster" >> $GITHUB_ENV
+              ;;
+            high)
+              echo "VBR=6000k"     >> $GITHUB_ENV
+              echo "MAXR=6000k"    >> $GITHUB_ENV
+              echo "BUFS=12000k"   >> $GITHUB_ENV
+              echo "PRESET=fast"   >> $GITHUB_ENV
+              ;;
+            *)
+              echo "VBR=4500k"        >> $GITHUB_ENV
+              echo "MAXR=4500k"       >> $GITHUB_ENV
+              echo "BUFS=9000k"       >> $GITHUB_ENV
+              echo "PRESET=veryfast"  >> $GITHUB_ENV
+              ;;
+          esac
+
+      - name: Set Logo Overlay Position
+        run: |
+          case "$LOGO_POS" in
+            topleft)     echo "OVERLAY_POS=20:20"         >> $GITHUB_ENV ;;
+            bottomleft)  echo "OVERLAY_POS=20:H-h-20"     >> $GITHUB_ENV ;;
+            bottomright) echo "OVERLAY_POS=W-w-20:H-h-20" >> $GITHUB_ENV ;;
+            *)           echo "OVERLAY_POS=W-w-20:20"     >> $GITHUB_ENV ;;
+          esac
+
+      - name: Set Speed Filters
+        run: |
+          SPEED_VAL="${SPEED:-1.0}"
+
+          # setpts: video speed. Formula = 1/speed
+          # atempo range is 0.5–2.0. For values outside, chain multiple atempo filters.
+          PTS=$(echo "$SPEED_VAL" | awk '{printf "%.6f", 1/$1}')
+
+          # Build atempo chain (handles speeds < 0.5 or > 2.0 by chaining)
+          ATEMPO=""
+          REMAINING="$SPEED_VAL"
+
+          # If speed > 2.0, chain: atempo=2.0,atempo=remaining/2.0 etc.
+          # If speed < 0.5, chain: atempo=0.5,atempo=remaining*2 etc.
+          python3 - <<EOF
+          import math, os
+
+          speed = float("$SPEED_VAL")
+          filters = []
+
+          if speed > 1.0:
+              remaining = speed
+              while remaining > 2.0:
+                  filters.append("atempo=2.0")
+                  remaining /= 2.0
+              filters.append(f"atempo={remaining:.6f}")
+          elif speed < 1.0:
+              remaining = speed
+              while remaining < 0.5:
+                  filters.append("atempo=0.5")
+                  remaining *= 2.0
+              filters.append(f"atempo={remaining:.6f}")
+          else:
+              filters.append("atempo=1.0")
+
+          atempo_chain = ",".join(filters)
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"ATEMPO_CHAIN={atempo_chain}\n")
+              f.write(f"VIDEO_PTS={speed:.6f}\n")
+
+          print(f"Speed: {speed} | PTS=1/{speed} | atempo: {atempo_chain}")
+          EOF
+
+      # ─── Main Stream Loop ───────────────────────────────────────────────────
+      - name: Start 24/7 HD Stream
+        run: |
+          echo "=============================="
+          echo "Stream shuru: $(date)"
+          echo "Quality: $QUALITY | Bitrate: $VBR"
+          echo "Playback Speed: ${SPEED}x"
+          echo "Video PTS factor: $VIDEO_PTS"
+          echo "Audio atempo: $ATEMPO_CHAIN"
+          echo "=============================="
+
+          # ── Video list: URL|Title ──
+          VIDEOS=(
+            "https://muaaziqbalvip.github.io/Milive2/6.mp4|PANIYON KI DUA"
+            "https://muaaziqbalvip.github.io/Milive2/1.mp4|FAJAR KA SUKOON"
+            "https://muaaziqbalvip.github.io/Milive2/2.mp4|SUKOON-E-ISHA"
+            "https://muaaziqbalvip.github.io/Milive2/5.mp4|ROH KI PYASS"
+            "https://muaaziqbalvip.github.io/Milive2/3.mp4|TSKEEN SE POUR"
+            "https://muaaziqbalvip.github.io/Milive2/4.mp4|SUCH KI TALWAR"
+          )
+
+          AD_URL="https://muaaziqbalvip.github.io/Milive2/0.mp4"
+          AD_TITLE="--- Special OFFER"
+
+          TOTAL=${#VIDEOS[@]}
+          FAIL_COUNT=0
+
+          # Pre-compute setpts value (1/speed)
+          PTS_EXPR=$(python3 -c "print(f'PTS*{1.0/float(\"$SPEED\"):.6f}')")
+          echo "setpts expression: $PTS_EXPR"
+
+          # Infinite loop
+          while true; do
+            for (( i=0; i<TOTAL; i++ )); do
+
+              # Current video info
+              CURRENT_ENTRY="${VIDEOS[$i]}"
+              CURRENT_URL="${CURRENT_ENTRY%%|*}"
+              CURRENT_TITLE="${CURRENT_ENTRY##*|}"
+
+              # Next video info (wrap around)
+              NEXT_INDEX=$(( (i+1) % TOTAL ))
+              NEXT_ENTRY="${VIDEOS[$NEXT_INDEX]}"
+              NEXT_TITLE="${NEXT_ENTRY##*|}"
+
+              echo "=============================="
+              echo "[$(date)] NOW: $CURRENT_TITLE"
+              echo "[$(date)] NEXT: $NEXT_TITLE"
+              echo "[$(date)] Speed: ${SPEED}x"
+              echo "=============================="
+
+              # ── Play current video ──
+              ffmpeg \
+                -re \
+                -i "$CURRENT_URL" \
+                -i logo.png \
+                -filter_complex \
+                  "[0:v]setpts=${PTS_EXPR},\
+                   scale=1920:1080:force_original_aspect_ratio=decrease,\
+                   pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,\
+                   setsar=1,fps=30[base];\
+                   [1:v]format=rgba,colorchannelmixer=aa=0.85[logo];\
+                   [base][logo]overlay=${OVERLAY_POS}:format=auto[withlogo];\
+                   [withlogo]drawtext=\
+                     text='NOW\\: ${CURRENT_TITLE}':fontsize=32:fontcolor=white:\
+                     box=1:boxcolor=black@0.6:boxborderw=8:\
+                     x=20:y=H-th-90:shadowx=2:shadowy=2,\
+                   drawtext=\
+                     text='NEXT\\: ${NEXT_TITLE}':fontsize=26:fontcolor=yellow:\
+                     box=1:boxcolor=black@0.6:boxborderw=8:\
+                     x=20:y=H-th-45:shadowx=2:shadowy=2[outv];\
+                   [0:a]${ATEMPO_CHAIN}[outa]" \
+                -map "[outv]" \
+                -map "[outa]" \
+                -c:v libx264 \
+                -preset "$PRESET" \
+                -tune zerolatency \
+                -profile:v high \
+                -level 4.2 \
+                -b:v "$VBR" \
+                -maxrate "$MAXR" \
+                -bufsize "$BUFS" \
+                -g 60 \
+                -keyint_min 60 \
+                -sc_threshold 0 \
+                -pix_fmt yuv420p \
+                -c:a aac \
+                -b:a 160k \
+                -ar 44100 \
+                -ac 2 \
+                -flvflags no_duration_filesize \
+                -f flv \
+                "${RTMP_URL}/${STREAM_KEY}" \
+                2>&1 | tee -a stream.log
+
+              EXIT_CODE=${PIPESTATUS[0]}
+              echo "[$(date)] Video done. Exit: $EXIT_CODE"
+
+              # ── Play Ad after each video ──
+              echo "[$(date)] AD chal rahi hai..."
+
+              ffmpeg \
+                -re \
+                -i "$AD_URL" \
+                -i logo.png \
+                -filter_complex \
+                  "[0:v]setpts=${PTS_EXPR},\
+                   scale=1920:1080:force_original_aspect_ratio=decrease,\
+                   pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,\
+                   setsar=1,fps=30[base];\
+                   [1:v]format=rgba,colorchannelmixer=aa=0.85[logo];\
+                   [base][logo]overlay=${OVERLAY_POS}:format=auto[withlogo];\
+                   [withlogo]drawtext=\
+                     text='${AD_TITLE}':fontsize=32:fontcolor=white:\
+                     box=1:boxcolor=black@0.6:boxborderw=8:\
+                     x=20:y=H-th-90:shadowx=2:shadowy=2,\
+                   drawtext=\
+                     text='NEXT\\: ${NEXT_TITLE}':fontsize=26:fontcolor=yellow:\
+                     box=1:boxcolor=black@0.6:boxborderw=8:\
+                     x=20:y=H-th-45:shadowx=2:shadowy=2[outv];\
+                   [0:a]${ATEMPO_CHAIN}[outa]" \
+                -map "[outv]" \
+                -map "[outa]" \
+                -c:v libx264 \
+                -preset "$PRESET" \
+                -tune zerolatency \
+                -profile:v high \
+                -level 4.2 \
+                -b:v "$VBR" \
+                -maxrate "$MAXR" \
+                -bufsize "$BUFS" \
+                -g 60 \
+                -keyint_min 60 \
+                -sc_threshold 0 \
+                -pix_fmt yuv420p \
+                -c:a aac \
+                -b:a 160k \
+                -ar 44100 \
+                -ac 2 \
+                -flvflags no_duration_filesize \
+                -f flv \
+                "${RTMP_URL}/${STREAM_KEY}" \
+                2>&1 | tee -a stream.log
+
+              echo "[$(date)] AD khatam. Next video load ho rahi hai..."
+              sleep 2
+
+            done
+
+            echo "[$(date)] Playlist complete — restart ho raha hai..."
+            FAIL_COUNT=$((FAIL_COUNT + 1))
+            if [ "$FAIL_COUNT" -gt 5 ]; then
+              sleep 30
+            else
+              sleep 3
+            fi
+
+          done
+
+      - name: Upload Stream Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stream-log-${{ github.run_number }}
+          path: stream.log
+          retention-days: 3
