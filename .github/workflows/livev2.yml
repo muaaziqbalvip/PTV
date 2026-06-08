@@ -1,4 +1,4 @@
-name: 24/7 YouTube Live Stream (Pro)
+name: 24/7 YouTube Live Stream (Pro) - Non-Stop
 
 on:
   workflow_dispatch:
@@ -16,30 +16,35 @@ on:
         required: false
         default: 'mid'
       playback_speed:
-        description: 'Video playback speed: 0.5 (slow) | 1.0 (normal) | 1.5 (fast) | 2.0 (very fast)'
+        description: 'Video playback speed (any decimal): 0.25 | 0.5 | 0.75 | 1.0 | 1.5 | 2.0 | 3.0 | 5.0 etc'
         required: false
-        default: '0.5'
+        default: '1.0'
   schedule:
-    - cron: '0 */5 * * *'
+    - cron: '0 */4 * * *'
 
 jobs:
   stream:
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    timeout-minutes: 480
 
     env:
       STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
       RTMP_URL: 'rtmp://a.rtmp.youtube.com/live2'
-      LOGO_URL: ${{ github.event.inputs.logo_url || 'https://i.ibb.co/gZFSmCPw/file-00000000305071fa945b58b012ac072b-removebg-preview.png' }}
+      LOGO_URL: ${{ github.event.inputs.logo_url || 'https://i.ibb.co/LzVJvDVz/file-00000000e55c7206934d363686b152fe.png' }}
       LOGO_POS: ${{ github.event.inputs.logo_position || 'topright' }}
       QUALITY:  ${{ github.event.inputs.quality_preset || 'mid' }}
       SPEED:    ${{ github.event.inputs.playback_speed || '1.0' }}
+      MAX_RETRIES: 5
+      RETRY_DELAY: 15
+      HEALTH_CHECK_INTERVAL: 60
 
     steps:
-      - name: Install FFmpeg
+      - name: Install FFmpeg & Tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg curl
+          sudo apt-get install -y ffmpeg curl jq wget htop
+          echo "=== Dependencies installed ==="
+          ffmpeg -version | grep version | head -1
 
       - name: Download Logo
         run: |
@@ -85,82 +90,91 @@ jobs:
             *)           echo "OVERLAY_POS=W-w-20:20"     >> $GITHUB_ENV ;;
           esac
 
-      - name: Set Speed Filters
+      - name: Set Speed Filters (Any Value)
         run: |
           SPEED_VAL="${SPEED:-1.0}"
+          echo "Raw speed input: $SPEED_VAL"
 
-          # setpts: video speed. Formula = 1/speed
-          # atempo range is 0.5–2.0. For values outside, chain multiple atempo filters.
-          PTS=$(echo "$SPEED_VAL" | awk '{printf "%.6f", 1/$1}')
+          python3 - <<'PYTHON_EOF'
+          import os
+          import math
 
-          # Build atempo chain (handles speeds < 0.5 or > 2.0 by chaining)
-          ATEMPO=""
-          REMAINING="$SPEED_VAL"
+          speed = float(os.environ.get("SPEED", "1.0"))
+          print(f"Processing speed: {speed}")
 
-          # If speed > 2.0, chain: atempo=2.0,atempo=remaining/2.0 etc.
-          # If speed < 0.5, chain: atempo=0.5,atempo=remaining*2 etc.
-          python3 - <<EOF
-          import math, os
-
-          speed = float("$SPEED_VAL")
-          filters = []
+          # Video: setpts â€” PTS factor hai 1/speed
+          pts_factor = 1.0 / speed
+          
+          # Audio: atempo chain bana (0.5 se 2.0 range me work karta hai)
+          atempo_filters = []
+          remaining = speed
 
           if speed > 1.0:
-              remaining = speed
               while remaining > 2.0:
-                  filters.append("atempo=2.0")
+                  atempo_filters.append("atempo=2.0")
                   remaining /= 2.0
-              filters.append(f"atempo={remaining:.6f}")
+              atempo_filters.append(f"atempo={remaining:.6f}")
           elif speed < 1.0:
-              remaining = speed
               while remaining < 0.5:
-                  filters.append("atempo=0.5")
+                  atempo_filters.append("atempo=0.5")
                   remaining *= 2.0
-              filters.append(f"atempo={remaining:.6f}")
+              atempo_filters.append(f"atempo={remaining:.6f}")
           else:
-              filters.append("atempo=1.0")
+              atempo_filters.append("atempo=1.0")
 
-          atempo_chain = ",".join(filters)
+          atempo_chain = ",".join(atempo_filters)
+
           with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"PTS_FACTOR={pts_factor:.6f}\n")
               f.write(f"ATEMPO_CHAIN={atempo_chain}\n")
-              f.write(f"VIDEO_PTS={speed:.6f}\n")
+              f.write(f"FINAL_SPEED={speed:.2f}\n")
 
-          print(f"Speed: {speed} | PTS=1/{speed} | atempo: {atempo_chain}")
-          EOF
+          print(f"âœ“ Speed: {speed}x")
+          print(f"  Video PTS: {pts_factor:.6f}")
+          print(f"  Audio atempo: {atempo_chain}")
+          PYTHON_EOF
 
-      # ─── Main Stream Loop ───────────────────────────────────────────────────
-      - name: Start 24/7 HD Stream
+      # â”€â”€â”€ Main 24/7 Stream Loop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      - name: Start 24/7 HD Stream (Non-Stop Auto-Restart)
         run: |
-          echo "=============================="
-          echo "Stream shuru: $(date)"
-          echo "Quality: $QUALITY | Bitrate: $VBR"
-          echo "Playback Speed: ${SPEED}x"
-          echo "Video PTS factor: $VIDEO_PTS"
-          echo "Audio atempo: $ATEMPO_CHAIN"
-          echo "=============================="
+          set +e  # Don't exit on error
 
-          # ── Video list: URL|Title ──
+          echo "â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—"
+          echo "â•‘        24/7 STREAM SHURU - AUTO-RESTART ENABLED                  â•‘"
+          echo "â•‘        Start time: $(date '+%Y-%m-%d %H:%M:%S %Z')                 â•‘"
+          echo "â•‘        Quality: $QUALITY | Speed: ${FINAL_SPEED}x | Bitrate: $VBR  â•‘"
+          echo "â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
+
+          # â”€â”€ Video list: URL|Title â”€â”€
           VIDEOS=(
-            "https://muaaziqbalvip.github.io/Milive2/0r.mp4|SURAH REHMAN"
-            "https://muaaziqbalvip.github.io/Milive2/0s.mp4|SURAH SAJDA"
-            "https://muaaziqbalvip.github.io/Milive2/0m.mp4|SURAH AL-Mulk"
-            "https://muaaziqbalvip.github.io/Milive2/0k.mp4|SURAH AL-KHAF"
-            "https://muaaziqbalvip.github.io/Milive2/0w.mp4|SURAH AL-WAQIA"
-            "https://mividstore.netlify.app/videoplayback%20(1).mp4|SURAH YASEEN"
+            "https://muaaziqbalvip.github.io/Milive2/6.mp4|PANIYON KI DUA"
+            "https://muaaziqbalvip.github.io/Milive2/1.mp4|FAJAR KA SUKOON"
+            "https://muaaziqbalvip.github.io/Milive2/2.mp4|SUKOON-E-ISHA"
+            "https://muaaziqbalvip.github.io/Milive2/5.mp4|ROH KI PYASS"
+            "https://muaaziqbalvip.github.io/Milive2/3.mp4|TSKEEN SE POUR"
+            "https://muaaziqbalvip.github.io/Milive2/4.mp4|SUCH KI TALWAR"
           )
 
-          AD_URL="https://muaaziqbalvip.github.io/Milive2/000.mp4"
+          AD_URL="https://muaaziqbalvip.github.io/Milive2/0.mp4"
           AD_TITLE="--- Special OFFER"
 
           TOTAL=${#VIDEOS[@]}
-          FAIL_COUNT=0
+          GLOBAL_CYCLE=0
+          GLOBAL_FAIL_COUNT=0
+          GLOBAL_SUCCESS_COUNT=0
 
-          # Pre-compute setpts value (1/speed)
-          PTS_EXPR=$(python3 -c "print(f'PTS*{1.0/float(\"$SPEED\"):.6f}')")
-          echo "setpts expression: $PTS_EXPR"
-
-          # Infinite loop
+          # â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+          # â•‘                    MAIN INFINITE LOOP - 24/7                          â•‘
+          # â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          
           while true; do
+            GLOBAL_CYCLE=$((GLOBAL_CYCLE + 1))
+            
+            echo ""
+            echo "â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”"
+            echo "â”‚ CYCLE #$GLOBAL_CYCLE | $(date '+%Y-%m-%d %H:%M:%S') | Success: $GLOBAL_SUCCESS_COUNT | Fails: $GLOBAL_FAIL_COUNT â”‚"
+            echo "â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜"
+
             for (( i=0; i<TOTAL; i++ )); do
 
               # Current video info
@@ -173,124 +187,203 @@ jobs:
               NEXT_ENTRY="${VIDEOS[$NEXT_INDEX]}"
               NEXT_TITLE="${NEXT_ENTRY##*|}"
 
-              echo "=============================="
-              echo "[$(date)] NOW: $CURRENT_TITLE"
-              echo "[$(date)] NEXT: $NEXT_TITLE"
-              echo "[$(date)] Speed: ${SPEED}x"
-              echo "=============================="
+              echo ""
+              echo "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”"
+              echo "ðŸŽ¬ [$(date '+%H:%M:%S')] NOW PLAYING: $CURRENT_TITLE"
+              echo "   NEXT UP: $NEXT_TITLE"
+              echo "   Speed: ${FINAL_SPEED}x | Attempt: $(($i + 1))/$TOTAL"
+              echo "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”"
 
-              # ── Play current video ──
-              ffmpeg \
-                -re \
-                -i "$CURRENT_URL" \
-                -i logo.png \
-                -filter_complex \
-                  "[0:v]setpts=${PTS_EXPR},\
-                   scale=1920:1080:force_original_aspect_ratio=decrease,\
-                   pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,\
-                   setsar=1,fps=30[base];\
-                   [1:v]format=rgba,colorchannelmixer=aa=0.85[logo];\
-                   [base][logo]overlay=${OVERLAY_POS}:format=auto[withlogo];\
-                   [withlogo]drawtext=\
-                     text='NOW\\: ${CURRENT_TITLE}':fontsize=32:fontcolor=white:\
-                     box=1:boxcolor=black@0.6:boxborderw=8:\
-                     x=20:y=H-th-90:shadowx=2:shadowy=2,\
-                   drawtext=\
-                     text='NEXT\\: ${NEXT_TITLE}':fontsize=26:fontcolor=yellow:\
-                     box=1:boxcolor=black@0.6:boxborderw=8:\
-                     x=20:y=H-th-45:shadowx=2:shadowy=2[outv];\
-                   [0:a]${ATEMPO_CHAIN}[outa]" \
-                -map "[outv]" \
-                -map "[outa]" \
-                -c:v libx264 \
-                -preset "$PRESET" \
-                -tune zerolatency \
-                -profile:v high \
-                -level 4.2 \
-                -b:v "$VBR" \
-                -maxrate "$MAXR" \
-                -bufsize "$BUFS" \
-                -g 60 \
-                -keyint_min 60 \
-                -sc_threshold 0 \
-                -pix_fmt yuv420p \
-                -c:a aac \
-                -b:a 160k \
-                -ar 44100 \
-                -ac 2 \
-                -flvflags no_duration_filesize \
-                -f flv \
-                "${RTMP_URL}/${STREAM_KEY}" \
-                2>&1 | tee -a stream.log
+              # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              # â”€â”€ Video streaming with error handling â”€â”€
+              # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              
+              RETRY_COUNT=0
+              VIDEO_STREAMED=0
 
-              EXIT_CODE=${PIPESTATUS[0]}
-              echo "[$(date)] Video done. Exit: $EXIT_CODE"
+              while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ $VIDEO_STREAMED -eq 0 ]; do
+                
+                if [ $RETRY_COUNT -gt 0 ]; then
+                  echo "âš ï¸  Retry #$RETRY_COUNT for: $CURRENT_TITLE"
+                  sleep $RETRY_DELAY
+                fi
 
-              # ── Play Ad after each video ──
-              echo "[$(date)] AD chal rahi hai..."
+                ffmpeg \
+                  -re \
+                  -i "$CURRENT_URL" \
+                  -i logo.png \
+                  -filter_complex \
+                    "[0:v]setpts=PTS/${PTS_FACTOR},\
+                     scale=1920:1080:force_original_aspect_ratio=decrease,\
+                     pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,\
+                     setsar=1,fps=30[base];\
+                     [1:v]format=rgba,colorchannelmixer=aa=0.85[logo];\
+                     [base][logo]overlay=${OVERLAY_POS}:format=auto[withlogo];\
+                     [withlogo]drawtext=\
+                       text='NOW\\: ${CURRENT_TITLE}':fontsize=32:fontcolor=white:\
+                       box=1:boxcolor=black@0.6:boxborderw=8:\
+                       x=20:y=H-th-90:shadowx=2:shadowy=2,\
+                     drawtext=\
+                       text='NEXT\\: ${NEXT_TITLE}':fontsize=26:fontcolor=yellow:\
+                       box=1:boxcolor=black@0.6:boxborderw=8:\
+                       x=20:y=H-th-45:shadowx=2:shadowy=2[outv];\
+                     [0:a]${ATEMPO_CHAIN}[outa]" \
+                  -map "[outv]" \
+                  -map "[outa]" \
+                  -c:v libx264 \
+                  -preset "$PRESET" \
+                  -tune zerolatency \
+                  -profile:v high \
+                  -level 4.2 \
+                  -b:v "$VBR" \
+                  -maxrate "$MAXR" \
+                  -bufsize "$BUFS" \
+                  -g 60 \
+                  -keyint_min 60 \
+                  -sc_threshold 0 \
+                  -pix_fmt yuv420p \
+                  -c:a aac \
+                  -b:a 160k \
+                  -ar 44100 \
+                  -ac 2 \
+                  -flvflags no_duration_filesize \
+                  -f flv \
+                  "${RTMP_URL}/${STREAM_KEY}" \
+                  2>&1 | tee -a stream.log
 
-              ffmpeg \
-                -re \
-                -i "$AD_URL" \
-                -i logo.png \
-                -filter_complex \
-                  "[0:v]setpts=${PTS_EXPR},\
-                   scale=1920:1080:force_original_aspect_ratio=decrease,\
-                   pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,\
-                   setsar=1,fps=30[base];\
-                   [1:v]format=rgba,colorchannelmixer=aa=0.85[logo];\
-                   [base][logo]overlay=${OVERLAY_POS}:format=auto[withlogo];\
-                   [withlogo]drawtext=\
-                     text='${AD_TITLE}':fontsize=32:fontcolor=white:\
-                     box=1:boxcolor=black@0.6:boxborderw=8:\
-                     x=20:y=H-th-90:shadowx=2:shadowy=2,\
-                   drawtext=\
-                     text='NEXT\\: ${NEXT_TITLE}':fontsize=26:fontcolor=yellow:\
-                     box=1:boxcolor=black@0.6:boxborderw=8:\
-                     x=20:y=H-th-45:shadowx=2:shadowy=2[outv];\
-                   [0:a]${ATEMPO_CHAIN}[outa]" \
-                -map "[outv]" \
-                -map "[outa]" \
-                -c:v libx264 \
-                -preset "$PRESET" \
-                -tune zerolatency \
-                -profile:v high \
-                -level 4.2 \
-                -b:v "$VBR" \
-                -maxrate "$MAXR" \
-                -bufsize "$BUFS" \
-                -g 60 \
-                -keyint_min 60 \
-                -sc_threshold 0 \
-                -pix_fmt yuv420p \
-                -c:a aac \
-                -b:a 160k \
-                -ar 44100 \
-                -ac 2 \
-                -flvflags no_duration_filesize \
-                -f flv \
-                "${RTMP_URL}/${STREAM_KEY}" \
-                2>&1 | tee -a stream.log
+                EXIT_CODE=${PIPESTATUS[0]}
+                
+                if [ $EXIT_CODE -eq 0 ]; then
+                  echo "âœ… [$(date '+%H:%M:%S')] Video done successfully!"
+                  VIDEO_STREAMED=1
+                  GLOBAL_SUCCESS_COUNT=$((GLOBAL_SUCCESS_COUNT + 1))
+                else
+                  echo "âŒ [$(date '+%H:%M:%S')] FFmpeg error: $EXIT_CODE"
+                  RETRY_COUNT=$((RETRY_COUNT + 1))
+                fi
+              done
 
-              echo "[$(date)] AD khatam. Next video load ho rahi hai..."
+              if [ $VIDEO_STREAMED -eq 0 ]; then
+                echo "â›” Failed after $MAX_RETRIES retries. Skipping to next video..."
+                GLOBAL_FAIL_COUNT=$((GLOBAL_FAIL_COUNT + 1))
+              fi
+
+              # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              # â”€â”€ AD streaming with error handling â”€â”€
+              # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              
+              echo ""
+              echo "ðŸ“¢ [$(date '+%H:%M:%S')] AD CHAL RAHI HAI..."
+
+              RETRY_COUNT=0
+              AD_STREAMED=0
+
+              while [ $RETRY_COUNT -lt 3 ] && [ $AD_STREAMED -eq 0 ]; do
+                
+                if [ $RETRY_COUNT -gt 0 ]; then
+                  echo "âš ï¸  Retry #$RETRY_COUNT for Ad"
+                  sleep $RETRY_DELAY
+                fi
+
+                ffmpeg \
+                  -re \
+                  -i "$AD_URL" \
+                  -i logo.png \
+                  -filter_complex \
+                    "[0:v]setpts=PTS/${PTS_FACTOR},\
+                     scale=1920:1080:force_original_aspect_ratio=decrease,\
+                     pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,\
+                     setsar=1,fps=30[base];\
+                     [1:v]format=rgba,colorchannelmixer=aa=0.85[logo];\
+                     [base][logo]overlay=${OVERLAY_POS}:format=auto[withlogo];\
+                     [withlogo]drawtext=\
+                       text='${AD_TITLE}':fontsize=32:fontcolor=white:\
+                       box=1:boxcolor=black@0.6:boxborderw=8:\
+                       x=20:y=H-th-90:shadowx=2:shadowy=2,\
+                     drawtext=\
+                       text='NEXT\\: ${NEXT_TITLE}':fontsize=26:fontcolor=yellow:\
+                       box=1:boxcolor=black@0.6:boxborderw=8:\
+                       x=20:y=H-th-45:shadowx=2:shadowy=2[outv];\
+                     [0:a]${ATEMPO_CHAIN}[outa]" \
+                  -map "[outv]" \
+                  -map "[outa]" \
+                  -c:v libx264 \
+                  -preset "$PRESET" \
+                  -tune zerolatency \
+                  -profile:v high \
+                  -level 4.2 \
+                  -b:v "$VBR" \
+                  -maxrate "$MAXR" \
+                  -bufsize "$BUFS" \
+                  -g 60 \
+                  -keyint_min 60 \
+                  -sc_threshold 0 \
+                  -pix_fmt yuv420p \
+                  -c:a aac \
+                  -b:a 160k \
+                  -ar 44100 \
+                  -ac 2 \
+                  -flvflags no_duration_filesize \
+                  -f flv \
+                  "${RTMP_URL}/${STREAM_KEY}" \
+                  2>&1 | tee -a stream.log
+
+                EXIT_CODE=${PIPESTATUS[0]}
+                
+                if [ $EXIT_CODE -eq 0 ]; then
+                  echo "âœ… [$(date '+%H:%M:%S')] Ad streamed successfully!"
+                  AD_STREAMED=1
+                  GLOBAL_SUCCESS_COUNT=$((GLOBAL_SUCCESS_COUNT + 1))
+                else
+                  echo "âŒ [$(date '+%H:%M:%S')] Ad FFmpeg error: $EXIT_CODE"
+                  RETRY_COUNT=$((RETRY_COUNT + 1))
+                fi
+              done
+
+              if [ $AD_STREAMED -eq 0 ]; then
+                echo "âš ï¸  Ad skipped due to errors"
+                GLOBAL_FAIL_COUNT=$((GLOBAL_FAIL_COUNT + 1))
+              fi
+
+              echo "â³ [$(date '+%H:%M:%S')] Next video loading in 2 seconds..."
               sleep 2
 
             done
 
-            echo "[$(date)] Playlist complete — restart ho raha hai..."
-            FAIL_COUNT=$((FAIL_COUNT + 1))
-            if [ "$FAIL_COUNT" -gt 5 ]; then
-              sleep 30
-            else
-              sleep 3
-            fi
+            # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            # â”€â”€ CYCLE COMPLETE - RESTART LOGIC â”€â”€
+            # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            
+            echo ""
+            echo "â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—"
+            echo "â•‘                  ðŸ”„ CYCLE #$GLOBAL_CYCLE COMPLETE                 â•‘"
+            echo "â•‘   Next cycle starts in 5 seconds...                            â•‘"
+            echo "â•‘   Success: $GLOBAL_SUCCESS_COUNT | Failures: $GLOBAL_FAIL_COUNT                  â•‘"
+            echo "â•‘   Time: $(date '+%Y-%m-%d %H:%M:%S %Z')                           â•‘"
+            echo "â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
+            echo ""
+            
+            sleep 5
 
           done
 
-      - name: Upload Stream Log
+      - name: Upload Stream Log (if exists)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: stream-log-${{ github.run_number }}
           path: stream.log
-          retention-days: 3
+          retention-days: 7
+
+      - name: Health Check Summary
+        if: always()
+        run: |
+          echo "â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
+          echo "STREAM SESSION SUMMARY"
+          echo "â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
+          echo "Job ended at: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+          echo "Quality: $QUALITY"
+          echo "Speed: ${FINAL_SPEED}x"
+          echo "Log file:"
+          tail -50 stream.log 2>/dev/null || echo "No log available"
+          echo "â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
