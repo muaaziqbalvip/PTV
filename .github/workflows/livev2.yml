@@ -18,7 +18,7 @@ on:
       playback_speed:
         description: 'Video playback speed (any decimal): 0.25 | 0.5 | 0.75 | 1.0 | 1.5 | 2.0 | 3.0 | 5.0 etc'
         required: false
-        default: '1.0'
+        default: '0.7'
   schedule:
     - cron: '0 */5 * * *'
 
