@@ -102,7 +102,7 @@ jobs:
           speed = float(os.environ.get("SPEED", "1.0"))
           print(f"Processing speed: {speed}")
 
-          # Video: setpts â€” PTS factor hai 1/speed
+          # Video: setpts — PTS factor hai 1/speed
           pts_factor = 1.0 / speed
           
           # Audio: atempo chain bana (0.5 se 2.0 range me work karta hai)
@@ -129,23 +129,23 @@ jobs:
               f.write(f"ATEMPO_CHAIN={atempo_chain}\n")
               f.write(f"FINAL_SPEED={speed:.2f}\n")
 
-          print(f"âœ“ Speed: {speed}x")
+          print(f"✓ Speed: {speed}x")
           print(f"  Video PTS: {pts_factor:.6f}")
           print(f"  Audio atempo: {atempo_chain}")
           PYTHON_EOF
 
-      # â”€â”€â”€ Main 24/7 Stream Loop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      # ─── Main 24/7 Stream Loop ───────────────────────────────────────────────────
       - name: Start 24/7 HD Stream (Non-Stop Auto-Restart)
         run: |
           set +e  # Don't exit on error
 
-          echo "â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—"
-          echo "â•‘        24/7 STREAM SHURU - AUTO-RESTART ENABLED                  â•‘"
-          echo "â•‘        Start time: $(date '+%Y-%m-%d %H:%M:%S %Z')                 â•‘"
-          echo "â•‘        Quality: $QUALITY | Speed: ${FINAL_SPEED}x | Bitrate: $VBR  â•‘"
-          echo "â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
+          echo "╔══════════════════════════════════════════════════════════════════╗"
+          echo "║        24/7 STREAM SHURU - AUTO-RESTART ENABLED                  ║"
+          echo "║        Start time: $(date '+%Y-%m-%d %H:%M:%S %Z')                 ║"
+          echo "║        Quality: $QUALITY | Speed: ${FINAL_SPEED}x | Bitrate: $VBR  ║"
+          echo "╚══════════════════════════════════════════════════════════════════╝"
 
-          # â”€â”€ Video list: URL|Title â”€â”€
+          # ── Video list: URL|Title ──
           VIDEOS=(
             "https://muaaziqbalvip.github.io/Milive2/6.mp4|PANIYON KI DUA"
             "https://muaaziqbalvip.github.io/Milive2/1.mp4|FAJAR KA SUKOON"
@@ -163,17 +163,17 @@ jobs:
           GLOBAL_FAIL_COUNT=0
           GLOBAL_SUCCESS_COUNT=0
 
-          # â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
-          # â•‘                    MAIN INFINITE LOOP - 24/7                          â•‘
-          # â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          # ╔═══════════════════════════════════════════════════════════════════════╗
+          # ║                    MAIN INFINITE LOOP - 24/7                          ║
+          # ╚═══════════════════════════════════════════════════════════════════════╝
           
           while true; do
             GLOBAL_CYCLE=$((GLOBAL_CYCLE + 1))
             
             echo ""
-            echo "â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”"
-            echo "â”‚ CYCLE #$GLOBAL_CYCLE | $(date '+%Y-%m-%d %H:%M:%S') | Success: $GLOBAL_SUCCESS_COUNT | Fails: $GLOBAL_FAIL_COUNT â”‚"
-            echo "â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜"
+            echo "┌────────────────────────────────────────────────────────────────┐"
+            echo "│ CYCLE #$GLOBAL_CYCLE | $(date '+%Y-%m-%d %H:%M:%S') | Success: $GLOBAL_SUCCESS_COUNT | Fails: $GLOBAL_FAIL_COUNT │"
+            echo "└────────────────────────────────────────────────────────────────┘"
 
             for (( i=0; i<TOTAL; i++ )); do
 
@@ -188,15 +188,15 @@ jobs:
               NEXT_TITLE="${NEXT_ENTRY##*|}"
 
               echo ""
-              echo "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”"
-              echo "ðŸŽ¬ [$(date '+%H:%M:%S')] NOW PLAYING: $CURRENT_TITLE"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "🎬 [$(date '+%H:%M:%S')] NOW PLAYING: $CURRENT_TITLE"
               echo "   NEXT UP: $NEXT_TITLE"
               echo "   Speed: ${FINAL_SPEED}x | Attempt: $(($i + 1))/$TOTAL"
-              echo "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-              # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-              # â”€â”€ Video streaming with error handling â”€â”€
-              # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              # ─────────────────────────────────────────────────────────────────
+              # ── Video streaming with error handling ──
+              # ─────────────────────────────────────────────────────────────────
               
               RETRY_COUNT=0
               VIDEO_STREAMED=0
@@ -204,7 +204,7 @@ jobs:
               while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ $VIDEO_STREAMED -eq 0 ]; do
                 
                 if [ $RETRY_COUNT -gt 0 ]; then
-                  echo "âš ï¸  Retry #$RETRY_COUNT for: $CURRENT_TITLE"
+                  echo "⚠️  Retry #$RETRY_COUNT for: $CURRENT_TITLE"
                   sleep $RETRY_DELAY
                 fi
 
@@ -254,26 +254,26 @@ jobs:
                 EXIT_CODE=${PIPESTATUS[0]}
                 
                 if [ $EXIT_CODE -eq 0 ]; then
-                  echo "âœ… [$(date '+%H:%M:%S')] Video done successfully!"
+                  echo "✅ [$(date '+%H:%M:%S')] Video done successfully!"
                   VIDEO_STREAMED=1
                   GLOBAL_SUCCESS_COUNT=$((GLOBAL_SUCCESS_COUNT + 1))
                 else
-                  echo "âŒ [$(date '+%H:%M:%S')] FFmpeg error: $EXIT_CODE"
+                  echo "❌ [$(date '+%H:%M:%S')] FFmpeg error: $EXIT_CODE"
                   RETRY_COUNT=$((RETRY_COUNT + 1))
                 fi
               done
 
               if [ $VIDEO_STREAMED -eq 0 ]; then
-                echo "â›” Failed after $MAX_RETRIES retries. Skipping to next video..."
+                echo "⛔ Failed after $MAX_RETRIES retries. Skipping to next video..."
                 GLOBAL_FAIL_COUNT=$((GLOBAL_FAIL_COUNT + 1))
               fi
 
-              # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-              # â”€â”€ AD streaming with error handling â”€â”€
-              # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              # ─────────────────────────────────────────────────────────────────
+              # ── AD streaming with error handling ──
+              # ─────────────────────────────────────────────────────────────────
               
               echo ""
-              echo "ðŸ“¢ [$(date '+%H:%M:%S')] AD CHAL RAHI HAI..."
+              echo "📢 [$(date '+%H:%M:%S')] AD CHAL RAHI HAI..."
 
               RETRY_COUNT=0
               AD_STREAMED=0
@@ -281,7 +281,7 @@ jobs:
               while [ $RETRY_COUNT -lt 3 ] && [ $AD_STREAMED -eq 0 ]; do
                 
                 if [ $RETRY_COUNT -gt 0 ]; then
-                  echo "âš ï¸  Retry #$RETRY_COUNT for Ad"
+                  echo "⚠️  Retry #$RETRY_COUNT for Ad"
                   sleep $RETRY_DELAY
                 fi
 
@@ -331,36 +331,36 @@ jobs:
                 EXIT_CODE=${PIPESTATUS[0]}
                 
                 if [ $EXIT_CODE -eq 0 ]; then
-                  echo "âœ… [$(date '+%H:%M:%S')] Ad streamed successfully!"
+                  echo "✅ [$(date '+%H:%M:%S')] Ad streamed successfully!"
                   AD_STREAMED=1
                   GLOBAL_SUCCESS_COUNT=$((GLOBAL_SUCCESS_COUNT + 1))
                 else
-                  echo "âŒ [$(date '+%H:%M:%S')] Ad FFmpeg error: $EXIT_CODE"
+                  echo "❌ [$(date '+%H:%M:%S')] Ad FFmpeg error: $EXIT_CODE"
                   RETRY_COUNT=$((RETRY_COUNT + 1))
                 fi
               done
 
               if [ $AD_STREAMED -eq 0 ]; then
-                echo "âš ï¸  Ad skipped due to errors"
+                echo "⚠️  Ad skipped due to errors"
                 GLOBAL_FAIL_COUNT=$((GLOBAL_FAIL_COUNT + 1))
               fi
 
-              echo "â³ [$(date '+%H:%M:%S')] Next video loading in 2 seconds..."
+              echo "⏳ [$(date '+%H:%M:%S')] Next video loading in 2 seconds..."
               sleep 2
 
             done
 
-            # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            # â”€â”€ CYCLE COMPLETE - RESTART LOGIC â”€â”€
-            # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            # ─────────────────────────────────────────────────────────────────
+            # ── CYCLE COMPLETE - RESTART LOGIC ──
+            # ─────────────────────────────────────────────────────────────────
             
             echo ""
-            echo "â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—"
-            echo "â•‘                  ðŸ”„ CYCLE #$GLOBAL_CYCLE COMPLETE                 â•‘"
-            echo "â•‘   Next cycle starts in 5 seconds...                            â•‘"
-            echo "â•‘   Success: $GLOBAL_SUCCESS_COUNT | Failures: $GLOBAL_FAIL_COUNT                  â•‘"
-            echo "â•‘   Time: $(date '+%Y-%m-%d %H:%M:%S %Z')                           â•‘"
-            echo "â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
+            echo "╔════════════════════════════════════════════════════════════════╗"
+            echo "║                  🔄 CYCLE #$GLOBAL_CYCLE COMPLETE                 ║"
+            echo "║   Next cycle starts in 5 seconds...                            ║"
+            echo "║   Success: $GLOBAL_SUCCESS_COUNT | Failures: $GLOBAL_FAIL_COUNT                  ║"
+            echo "║   Time: $(date '+%Y-%m-%d %H:%M:%S %Z')                           ║"
+            echo "╚════════════════════════════════════════════════════════════════╝"
             echo ""
             
             sleep 5
@@ -378,12 +378,12 @@ jobs:
       - name: Health Check Summary
         if: always()
         run: |
-          echo "â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
+          echo "════════════════════════════════════════════════════════════════"
           echo "STREAM SESSION SUMMARY"
-          echo "â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
+          echo "════════════════════════════════════════════════════════════════"
           echo "Job ended at: $(date '+%Y-%m-%d %H:%M:%S %Z')"
           echo "Quality: $QUALITY"
           echo "Speed: ${FINAL_SPEED}x"
           echo "Log file:"
           tail -50 stream.log 2>/dev/null || echo "No log available"
-          echo "â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
+          echo "════════════════════════════════════════════════════════════════"
