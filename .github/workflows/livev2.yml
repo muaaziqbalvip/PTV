@@ -26,7 +26,7 @@ jobs:
     env:
       STREAM_KEY: ${{ secrets.YOUTUBE_STREAM_KEY }}
       RTMP_URL: 'rtmp://a.rtmp.youtube.com/live2'
-      LOGO_URL: ${{ github.event.inputs.logo_url || 'https://i.ibb.co/LzVJvDVz/file-00000000e55c7206934d363686b152fe.png' }}
+      LOGO_URL: ${{ github.event.inputs.logo_url || 'https://i.ibb.co/gZFSmCPw/file-00000000305071fa945b58b012ac072b-removebg-preview.png' }}
       LOGO_POS: ${{ github.event.inputs.logo_position || 'topright' }}
       QUALITY:  ${{ github.event.inputs.quality_preset || 'mid' }}
 
